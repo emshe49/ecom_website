@@ -1,0 +1,308 @@
+# System Architecture & Technical Design
+
+## 1. Architectural Style: Modular Monolith
+
+This e-commerce platform is engineered strictly as a **Modular Monolith**.
+
+### Why Modular Monolith (and NOT Microservices)?
+1. **Zero Distributed System Overhead**: Microservices introduce significant network latency, complex distributed transactions (2PC/Sagas), eventual consistency failures, API gateway maintenance, duplicated code, and service mesh management.
+2. **Simplified Operational Complexity**: The entire backend is deployed, monitored, and scaled as a **single backend application** communicating with a unified database cluster.
+3. **Strict Domain Isolation**: Business boundaries are enforced logically and structurally inside `server/src/modules/` with TypeScript types and encapsulated service functions.
+4. **Direct In-Process Performance**: Cross-module communication occurs via in-process TypeScript function calls with near-zero latency and type safety, rather than over-the-network REST or message bus hops.
+
+> **Explicit Architectural Constraint**: Microservices, separate authentication services, separate user/address services, API gateways, and distributed message broker architectures (such as RabbitMQ or Kafka for cross-service routing) are **intentionally not used**.
+
+---
+
+## 2. Modular Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Client Layer                           │
+│   React 19 + TypeScript + Zustand + TanStack Query          │
+│   - Short-lived Access Token in memory                      │
+│   - Silent session recovery on boot via /auth/refresh       │
+│   - Server State management for Profile & Addresses         │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ HTTP / JSON REST
+                               │ (Credentials: true)
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Backend Core                           │
+│   Express Application (server/src/app.ts & server.ts)       │
+│                                                             │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Security Middleware: Helmet, CORS, CookieParser,      │  │
+│  │                     RateLimiters, RequestLogger       │  │
+│  └───────────────────────────┬───────────────────────────┘  │
+│                              │                              │
+│                              ▼                              │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Modular Monolith Modules (server/src/modules/)        │  │
+│  │                                                       │  │
+│  │  [Module 02: Auth]       [Module 03: Users]           │  │
+│  │  - auth.service.ts       - user.service.ts            │  │
+│  │  - auth-token.service.ts - user.model.ts              │  │
+│  │  - auth-session.model.ts - user.mapper.ts             │  │
+│  │                                                       │  │
+│  │  [Module 03: Addresses]                               │  │
+│  │  - address.service.ts    - address.model.ts           │  │
+│  │  - Ownership scope checks                             │  │
+│  │  - Auto default promotion                             │  │
+│  │                                                       │  │
+│  │  [Shared Core]                                        │  │
+│  │  - password.service.ts   - email.service.ts           │  │
+│  │  - Central error handling & AppError                  │  │
+│  └───────────────────────────┬───────────────────────────┘  │
+│                              │                              │
+│                              ▼                              │
+│  ┌───────────────────────────────────────────────────────┐  │
+│  │ Global Middleware: 404 Handler, Central Error Handler │  │
+│  └───────────────────────────┬───────────────────────────┘  │
+└──────────────────────────────┼──────────────────────────────┘
+                               │ Mongoose ODM
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     MongoDB Database                        │
+│               (Unified Database Architecture)               │
+│               Collections: users, authsessions, addresses   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3. User Profile & Address Management Architecture (Module 03)
+
+### 3.1 User Profile Management
+- Customer profiles extend the authenticated `User` model with optional contact information (`phone`, `avatarUrl`).
+- Profile retrieval (`GET /api/v1/users/me`) and modification (`PATCH /api/v1/users/me`) are strictly allow-listed.
+- **Mass Assignment Immunity**: Direct modifications to `email`, `role`, `isActive`, `isEmailVerified`, `passwordHash`, or security timestamps are strictly blocked by validation schemas.
+- Profile responses are sanitized via `UserMapper.toSafeUser` to guarantee that security secrets are never leaked.
+
+### 3.2 Address Management & Ownership Security
+- **Separate Collection**: Saved addresses live in a dedicated `addresses` collection rather than embedded in user documents, ensuring fast updates, clean indexing, and scalable checkout handling.
+- **Strict IDOR Prevention**: Every address database operation unconditionally scopes queries by `{ _id: addressId, userId: authenticatedUserId }`. Cross-user access attempts return `404 Not Found`.
+- **Default Address State Rules**:
+  1. **First Address Creation**: Automatically assigned as both `isDefaultShipping: true` and `isDefaultBilling: true`.
+  2. **Switching Defaults**: Setting an address as default shipping/billing automatically unsets the flag on any previous default address for that user.
+  3. **Deletion Replacement**: When a default shipping or billing address is deleted, the backend automatically promotes the most recently updated remaining address (`{ updatedAt: -1 }`) to maintain valid default references.
+  4. **Address Limits**: A safety limit of **20 addresses per user** (`MAX_ADDRESSES_PER_USER`) is enforced to prevent resource abuse.
+
+### 3.3 Future Order Address Snapshot Rule (Checkout Integration)
+> [!IMPORTANT]
+> When the checkout and order management module is implemented in the future, orders **must store an immutable snapshot** of the customer's shipping and billing address at the moment of order placement.
+> Future orders must **never** reference live `Address` documents by ObjectId alone, ensuring that customer edits or deletions to saved addresses do not retroactively corrupt historical order records.
+
+---
+
+## 4. Roles & Permissions RBAC Architecture (Module 04)
+
+### 4.1 Canonical Roles
+The system defines 7 canonical roles with strict hierarchical and functional responsibilities:
+1. **`CUSTOMER`**: Default role for public registrations. Access is restricted to personal profile, address book, and storefront operations via authentication + ownership checks.
+2. **`SUPER_ADMIN`**: Master administrative role. Automatically receives all catalog permissions and is the only role permitted to provision staff accounts and modify staff roles.
+3. **`ADMIN`**: General store administrator with broad operational capabilities across catalog, orders, promotions, reviews, and support, but barred from creating staff or modifying staff roles.
+4. **`PRODUCT_MANAGER`**: Dedicated catalog management (categories, brands, products, variants, and inventory read).
+5. **`ORDER_MANAGER`**: Dedicated customer orders, fulfillment, cancellations, and return/refund processing.
+6. **`INVENTORY_MANAGER`**: Warehouse stock levels, inventory audits, and stock adjustments.
+7. **`CUSTOMER_SUPPORT`**: Support ticket management, customer read, order read, and review moderation read.
+
+### 4.2 Permission Resolution Pipeline
+```
+[Client Request]
+       │ (Bearer Access Token)
+       ▼
+[authenticate middleware]
+       │ Fetches real-time User from DB
+       │ Verifies isActive === true
+       │ Attaches req.user = { id, role, email }
+       ▼
+[requirePermission(permission) middleware]
+       │ Evaluates authorizationService.hasPermission(req.user.role, permission)
+       │ - SUPER_ADMIN: Always TRUE
+       │ - Non-matching role: Rejects with 403 (ERR_PERMISSION_REQUIRED)
+       ▼
+[Controller Action]
+```
+
+### 4.3 Role-Permission Matrix
+
+| Permission | SUPER_ADMIN | ADMIN | PRODUCT_MANAGER | ORDER_MANAGER | INVENTORY_MANAGER | CUSTOMER_SUPPORT | CUSTOMER |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `user:read` | ✓ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ |
+| `user:update` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `admin-user:create` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `admin-user:read` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `admin-user:update-role` | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `admin-user:disable` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `category:*` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `brand:*` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `product:*` | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `inventory:read` | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
+| `inventory:update/adjust` | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
+| `order:*` | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| `return:*` | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| `refund:*` | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| `review:*` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `promotion:*` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `coupon:*` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `support:*` | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✗ |
+| `analytics:read` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `audit:read` | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+
+---
+
+## 5. API Endpoint Catalog
+
+### System Health
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/health` | System health check, environment info, uptime, and database connectivity |
+
+### Authentication (Module 02 & Module 04)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/v1/auth/register` | No | Creates a new customer account |
+| `POST` | `/api/v1/auth/login` | No | Authenticates credentials, returns access token, sets HttpOnly cookie |
+| `POST` | `/api/v1/auth/refresh` | No (Cookie) | Rotates refresh token and issues new access token |
+| `POST` | `/api/v1/auth/logout` | No (Cookie) | Revokes current session and clears cookie |
+| `POST` | `/api/v1/auth/logout-all` | Yes (Bearer) | Revokes all active sessions across all devices |
+| `GET` | `/api/v1/auth/me` | Yes (Bearer) | Returns identity info for authentication context |
+| `GET` | `/api/v1/auth/permissions` | Yes (Bearer) | Returns current role and effective permissions catalog |
+| `POST` | `/api/v1/auth/verify-email` | No | Verifies email via cryptographic token |
+| `POST` | `/api/v1/auth/resend-verification` | No | Resends email verification link |
+| `POST` | `/api/v1/auth/forgot-password` | No | Requests password reset (anti-enumeration protected) |
+| `POST` | `/api/v1/auth/reset-password` | No | Resets password with token and revokes sessions |
+| `POST` | `/api/v1/auth/change-password` | Yes (Bearer) | Updates password and revokes other sessions |
+
+### User Profile (Module 03)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/users/me` | Yes (Bearer) | Returns the detailed authenticated user profile |
+| `PATCH` | `/api/v1/users/me` | Yes (Bearer) | Updates first name, last name, phone, or avatar URL |
+
+### Address Management (Module 03)
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/v1/addresses` | Yes (Bearer) | Creates a new address for the authenticated user (max 20) |
+| `GET` | `/api/v1/addresses` | Yes (Bearer) | Lists all saved addresses for the authenticated user |
+| `GET` | `/api/v1/addresses/:addressId` | Yes (Bearer) | Retrieves a single owned address by ID |
+| `PATCH` | `/api/v1/addresses/:addressId` | Yes (Bearer) | Updates fields of an owned address |
+| `DELETE` | `/api/v1/addresses/:addressId` | Yes (Bearer) | Deletes an owned address and reassigns defaults if needed |
+| `PATCH` | `/api/v1/addresses/:addressId/default-shipping` | Yes (Bearer) | Sets the target address as default shipping |
+| `PATCH` | `/api/v1/addresses/:addressId/default-billing` | Yes (Bearer) | Sets the target address as default billing |
+
+### Admin Staff Management (Module 04)
+| Method | Endpoint | Required Permission | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/v1/admin/users` | `admin-user:create` | Creates a new staff user and dispatches activation link |
+| `GET` | `/api/v1/admin/users` | `admin-user:read` | Lists all administrative staff accounts |
+| `PATCH` | `/api/v1/admin/users/:userId/role` | `admin-user:update-role` | Updates staff role and revokes active sessions |
+| `PATCH` | `/api/v1/admin/users/:userId/status` | `admin-user:disable` | Enables or disables staff account and revokes sessions |
+
+### Categories Catalog (Module 05)
+| Method | Endpoint | Required Permission | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/categories` | Public | Lists active categories with pagination, search, and sorting |
+| `GET` | `/api/v1/categories/tree` | Public | Returns complete hierarchical category tree (active only) |
+| `GET` | `/api/v1/categories/:slug` | Public | Retrieves active category details by unique slug |
+| `POST` | `/api/v1/admin/categories` | `category:create` | Creates a new root or subcategory (max depth 3) |
+| `GET` | `/api/v1/admin/categories` | `category:read` | Lists all categories with audit metadata and filters |
+| `GET` | `/api/v1/admin/categories/:categoryId` | `category:read` | Retrieves full category details by ID |
+| `PATCH` | `/api/v1/admin/categories/:categoryId` | `category:update` | Updates category details, hierarchy, or status |
+| `DELETE` | `/api/v1/admin/categories/:categoryId` | `category:delete` | Deletes a leaf category (protected against child categories) |
+
+### Brands Catalog (Module 05)
+| Method | Endpoint | Required Permission | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/brands` | Public | Lists active brands with pagination, search, and sorting |
+| `GET` | `/api/v1/brands/:slug` | Public | Retrieves active brand details by unique slug |
+| `POST` | `/api/v1/admin/brands` | `brand:create` | Creates a new brand (case-insensitive name & unique slug) |
+| `GET` | `/api/v1/admin/brands` | `brand:read` | Lists all brands with audit metadata and filters |
+| `GET` | `/api/v1/admin/brands/:brandId` | `brand:read` | Retrieves full brand details by ID |
+| `PATCH` | `/api/v1/admin/brands/:brandId` | `brand:update` | Updates brand details or status |
+| `DELETE` | `/api/v1/admin/brands/:brandId` | `brand:delete` | Deletes a brand |
+
+---
+
+## 6. Catalog Domain Architecture & Rules (Module 05)
+
+### 6.1 Category Hierarchy & Constraints
+1. **Hierarchical Nesting**: Categories support parent-child relationships via `parentId` referencing `Category._id`.
+2. **Depth Limit**: Maximum category nesting depth is strictly enforced at **3 levels** (`ERR_CATEGORY_MAX_DEPTH`).
+3. **Cycle Prevention**: Circular ancestry is detected and rejected on update (`ERR_CATEGORY_CYCLE`).
+4. **Self-Parent Protection**: A category cannot be set as its own parent (`ERR_CATEGORY_SELF_PARENT`).
+5. **Parent Existence**: New or moved categories require a valid existing parent category (`ERR_PARENT_CATEGORY_NOT_FOUND`).
+6. **Child Delete Protection**: Deleting a category with active child categories is blocked with `409 Conflict` (`ERR_CATEGORY_HAS_CHILDREN`).
+7. **Unique Slugs**: Category slugs are URL-safe, lowercase, and globally unique across the entire catalog (`ERR_CATEGORY_SLUG_EXISTS`).
+8. **In-Memory Tree Assembly**: The public `/categories/tree` endpoint aggregates active categories in a single query and constructs the nested tree in-memory for minimal database load.
+
+### 6.2 Brand Management & Uniqueness
+1. **Case-Insensitive Uniqueness**: Brand names are strictly unique regardless of casing via a dedicated indexed `normalizedName` field (`ERR_BRAND_NAME_EXISTS`).
+2. **Global Unique Slugs**: Brand slugs are lowercase, URL-safe, and unique across all brands (`ERR_BRAND_SLUG_EXISTS`).
+3. **Flat Structure**: Brands are non-hierarchical entities with optional logos, descriptions, and official external website links.
+4. **Catalog Scoping**: Inactive categories and brands are automatically omitted from customer-facing browsing and search endpoints.
+
+---
+
+## 7. Shopping Cart Management Architecture (Module 08)
+
+### 7.1 Cart Domain Flow & Relationships
+```
+Authenticated Customer (CUSTOMER role)
+             │ (1-to-1 unique)
+             ▼
+        Cart Document
+             │ (1-to-many embedded items, max 50 lines)
+             ▼
+      Embedded Cart Item { variantId, quantity, addedAt }
+             │ (dynamic batched in-process resolution)
+             ▼
+       ProductVariant
+             │ (parent reference)
+             ▼
+          Product ──► Category & Brand
+```
+
+### 7.2 Core Architectural Principles
+1. **Dynamic Resolution over Static Snapshots**: Cart items persist only `{ variantId, quantity, addedAt }`. Product name, slug, SKU, primary image, variant attributes, active pricing, and sellability flags are resolved dynamically upon query.
+2. **Authoritative Backend Pricing**: Variant prices in MongoDB are the sole source of truth in integer minor monetary units (paisa/cents). Client-supplied prices are strictly rejected by validation schemas.
+3. **Batched Enrichment (No N+1 Queries)**: During cart retrieval, variant IDs are collected and fetched in a single `$in` query, followed by a single batched parent product query with populated category and brand relations.
+4. **Resilient Unavailable Item Handling**: If a product, category, brand, or variant is deactivated or deleted after being placed in a cart:
+   - The cart endpoint returns `200 OK` without crashing.
+   - The affected line is marked `isAvailable: false` with an explicit `unavailableReason`.
+   - The item is excluded from the calculated `subtotal`.
+   - The customer can freely remove the unavailable or deleted item from their cart.
+5. **Strict IDOR Prevention & Role Scoping**: All cart queries and mutations are strictly scoped by the authenticated user's ID (`req.user.id`). Cart endpoints are restricted to `CUSTOMER` accounts, blocking operational staff roles with `403 Forbidden`.
+
+### 7.3 Cart API Endpoint Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/cart` | Yes (CUSTOMER) | Retrieves authenticated customer's cart (returns 200 with empty cart if none exists) |
+| `POST` | `/api/v1/cart/items` | Yes (CUSTOMER) | Adds an active variant to cart or increments quantity (max 99 per item, max 50 distinct items) |
+| `PATCH` | `/api/v1/cart/items/:variantId` | Yes (CUSTOMER) | Updates quantity (1–99) for a specific variant in the customer's cart |
+| `DELETE` | `/api/v1/cart/items/:variantId` | Yes (CUSTOMER) | Removes a specific variant from the cart (works even for deleted variants) |
+| `DELETE` | `/api/v1/cart` | Yes (CUSTOMER) | Clears all items from the customer's cart |
+
+### 7.4 Future Checkout & Order Snapshot Rules
+> [!IMPORTANT]
+> **Future Checkout Revalidation Rule (Module 11)**:
+> When the checkout module is implemented, checkout initialization must independently re-validate:
+> 1. Real-time product and variant availability.
+> 2. Authoritative current variant pricing.
+> 3. Real-time inventory stock availability and reservations (Module 10).
+> 4. Customer shipping and billing addresses.
+> 5. Shipping carrier rates and applicable tax calculations.
+> 
+> Cart subtotal calculations are ephemeral estimates for display and do not constitute a fixed price guarantee for future orders.
+
+> [!IMPORTANT]
+> **Future Order Snapshot Rule (Module 12)**:
+> When an order is placed, `OrderItem` documents must create an **immutable snapshot** of:
+> - Product Name & Slug
+> - SKU & Variant Attributes (e.g. Color, Storage, Size)
+> - Authoritative Unit Price at moment of checkout
+> - Purchased Quantity & Line Total
+>
+> Cart documents remain live and fluid, whereas Orders store permanent historical records.
+
