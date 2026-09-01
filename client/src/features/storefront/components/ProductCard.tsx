@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { ProductCardDTO } from '../types/product-search.types';
 import { formatMoney } from '../../../utils/money';
+import { WishlistButton } from '../../wishlist/components/WishlistButton';
 
 interface ProductCardProps {
   product: ProductCardDTO;
@@ -32,7 +33,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   return (
     <Link
       to={`/products/${product.slug}`}
-      className="group flex flex-col bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl overflow-hidden shadow-lg hover:shadow-indigo-500/10 transition-all duration-300 transform hover:-translate-y-1"
+      className="group relative flex flex-col bg-slate-900/60 hover:bg-slate-900/90 border border-slate-800 hover:border-indigo-500/50 rounded-2xl overflow-hidden shadow-lg hover:shadow-indigo-500/10 transition-all duration-300 transform hover:-translate-y-1"
     >
       {/* Product Image Box */}
       <div className="relative w-full aspect-square bg-slate-950/80 overflow-hidden flex items-center justify-center border-b border-slate-800/80">
@@ -49,6 +50,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
           </div>
         )}
 
+        {/* Wishlist Button (Top Right) */}
+        <div className="absolute top-3 right-3 z-10">
+          <WishlistButton
+            productId={product.id}
+            productName={product.name}
+            variant="icon"
+          />
+        </div>
+
         {/* Featured Badge */}
         {product.featured && (
           <div className="absolute top-3 left-3">
@@ -58,6 +68,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             </span>
           </div>
         )}
+
 
         {/* Variant Count Tag */}
         {product.availableVariantCount > 1 && (

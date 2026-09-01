@@ -306,3 +306,36 @@ Authenticated Customer (CUSTOMER role)
 >
 > Cart documents remain live and fluid, whereas Orders store permanent historical records.
 
+---
+
+## 8. Wishlist Management Domain Architecture (Module 09)
+
+### 8.1 Domain Boundaries & Principles
+The Wishlist module enables authenticated customers to bookmark products for future consideration:
+1. **Product vs. Variant Storage**:
+   - Wishlist documents persist reference to the **Product ID** (`productId`) and the timestamp (`addedAt`), rather than specific variants.
+   - Customers choose the exact product options/variants at the time of purchase when moving the item to their Cart.
+2. **Authoritative & Dynamic Pricing**:
+   - Wishlist documents **never store prices**. Prices and price ranges (`{ min, max, currency }`) are dynamically aggregated from all active variants during retrieval.
+3. **Availability & Resilience**:
+   - Saved items are evaluated in real time against the entire catalog hierarchy (Product status, Category active state, Brand active state, and active Variant count).
+   - If a product becomes unavailable or is hard-deleted from the database, it remains visible in the wishlist marked as `isAvailable: false` with an explanatory `unavailableReason`, allowing customers to see the change and remove the item without generating `500 Internal Server Error`s.
+4. **Batched Enrichment (Zero N+1 Queries)**:
+   - All wishlist products and their associated variants are resolved using two batched `$in` queries.
+5. **Idempotency & Limits**:
+   - Adding an already saved product is an idempotent success that retains the original `addedAt` timestamp.
+   - Wishlist size is strictly limited to 100 items (`MAX_WISHLIST_ITEMS = 100`).
+6. **Move to Cart Flow**:
+   - Single-variant products are moved directly to Cart with quantity 1 upon customer request and subsequently removed from the Wishlist upon successful addition.
+   - Multi-variant products present an interactive option selector modal to let the customer pick their desired variant before moving to Cart.
+   - If Cart addition fails, the item is preserved in the Wishlist.
+
+### 8.2 Wishlist API Endpoint Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/wishlist` | Yes (CUSTOMER) | Retrieves customer's wishlist with real-time price ranges and availability status |
+| `POST` | `/api/v1/wishlist/items` | Yes (CUSTOMER) | Adds an active product to the wishlist (idempotent, max 100 items) |
+| `DELETE` | `/api/v1/wishlist/items/:productId` | Yes (CUSTOMER) | Removes a saved product from the wishlist (resilient to deleted products) |
+| `DELETE` | `/api/v1/wishlist` | Yes (CUSTOMER) | Clears all items from the customer's wishlist |
+
+

@@ -9,6 +9,8 @@ import ForgotPasswordPage from '../features/auth/pages/ForgotPasswordPage';
 import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage';
 import ProfilePage from '../features/auth/pages/ProfilePage';
 import CartPage from '../features/cart/pages/CartPage';
+import WishlistPage from '../features/wishlist/pages/WishlistPage';
+
 import GuestRoute from '../features/auth/components/GuestRoute';
 import ProtectedRoute from '../features/auth/components/ProtectedRoute';
 import PermissionRoute from '../features/auth/components/PermissionRoute';
@@ -78,8 +80,13 @@ export const router = createBrowserRouter([
             path: 'cart',
             element: <CartPage />,
           },
+          {
+            path: 'wishlist',
+            element: <WishlistPage />,
+          },
         ],
       },
+
       // 404 Not Found
       {
         path: '*',

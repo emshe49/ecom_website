@@ -9,6 +9,7 @@ import { formatMoney } from '../../../utils/money';
 import { useAuthStore } from '../../auth/store/auth.store';
 import { cartApi } from '../../cart/api/cart.api';
 import { QuantityControl } from '../../cart/components/QuantityControl';
+import { WishlistButton } from '../../wishlist/components/WishlistButton';
 
 interface ApiErrorData {
   error?: {
@@ -236,7 +237,17 @@ export const StorefrontProductDetailPage: React.FC = () => {
                 </span>
               </div>
             )}
+
+            {/* Wishlist Button */}
+            <div className="absolute top-4 right-4 z-10">
+              <WishlistButton
+                productId={product.id}
+                productName={product.name}
+                variant="icon"
+              />
+            </div>
           </div>
+
 
           {/* Thumbnails list */}
           {images.length > 1 && (
@@ -438,6 +449,15 @@ export const StorefrontProductDetailPage: React.FC = () => {
                 </button>
               </div>
             </div>
+
+            {/* Wishlist Action Button */}
+            <WishlistButton
+              productId={product.id}
+              productName={product.name}
+              variant="button"
+              className="w-full"
+            />
+
 
             <div className="p-3 bg-slate-900/40 border border-slate-800 rounded-xl text-xs text-slate-400 flex items-center justify-between">
               <span>Authoritative pricing verified dynamically.</span>

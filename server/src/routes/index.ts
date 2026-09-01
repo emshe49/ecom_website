@@ -17,6 +17,8 @@ import {
   adminProductRouter,
 } from '../modules/catalog/products/product.routes.js';
 import { cartRouter } from '../modules/cart/cart.routes.js';
+import { wishlistRouter } from '../modules/wishlist/wishlist.routes.js';
+
 
 const apiRouter = Router();
 
@@ -39,8 +41,12 @@ v1Router.use('/admin/products', adminProductRouter);
 // Cart Routes (Module 08)
 v1Router.use('/cart', cartRouter);
 
+// Wishlist Routes (Module 09)
+v1Router.use('/wishlist', wishlistRouter);
+
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);
+
 
 export default apiRouter;
 

@@ -1,10 +1,11 @@
 import React from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Layers, ShieldCheck, Cpu, LogOut, LogIn, UserPlus, ShoppingCart } from 'lucide-react';
+import { Layers, ShieldCheck, Cpu, LogOut, LogIn, UserPlus, ShoppingCart, Heart } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '../features/auth/store/auth.store';
 import { authApi } from '../features/auth/api/auth.api';
 import { cartApi } from '../features/cart/api/cart.api';
+import { useWishlist } from '../features/wishlist/hooks/useWishlist';
 
 export const AppLayout: React.FC = () => {
   const { user, isAuthenticated, clearAuth } = useAuthStore();
@@ -19,7 +20,10 @@ export const AppLayout: React.FC = () => {
     staleTime: 1000 * 60, // 1 minute
   });
 
+  const { itemCount: wishlistItemCount } = useWishlist();
+
   const cartTotalQuantity = isCustomer && cart ? cart.totalQuantity : 0;
+
 
   const handleLogout = async () => {
     try {
@@ -60,6 +64,21 @@ export const AppLayout: React.FC = () => {
               <span>Explore Shop</span>
             </Link>
 
+            {/* Wishlist Link */}
+            <Link
+              to={isAuthenticated ? '/wishlist' : '/login'}
+              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors border border-slate-800"
+              title="Saved Wishlist"
+            >
+              <Heart className="w-4 h-4 text-rose-400" />
+              <span className="hidden sm:inline">Wishlist</span>
+              {wishlistItemCount > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-mono text-[10px] font-bold shadow-sm shadow-rose-600/50 animate-fadeIn">
+                  {wishlistItemCount}
+                </span>
+              )}
+            </Link>
+
             {/* Cart Link */}
             <Link
               to={isAuthenticated ? '/cart' : '/login'}
@@ -74,6 +93,7 @@ export const AppLayout: React.FC = () => {
                 </span>
               )}
             </Link>
+
 
             {isAuthenticated && user ? (
               <div className="flex items-center gap-3">
