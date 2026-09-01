@@ -446,6 +446,50 @@ The Wishlist module enables authenticated customers to bookmark products for fut
 | `POST` | `/api/v1/admin/orders/:orderId/cancel` | Yes (`order:cancel`) | Admin order cancellation override with stock restoration |
 | `PATCH`| `/api/v1/admin/orders/:orderId/notes` | Yes (`order:update_notes`) | Updates internal staff-only operational notes |
 
+---
+
+## 12. Payments Domain Architecture (Module 13)
+
+### 12.1 Core Principles: Separation of Concerns, Server Authority & Security
+1. **Separation of Aggregates**:
+   - `Order` aggregate owns what was purchased, frozen item snapshots, addresses, and physical warehouse inventory holds.
+   - `Payment` aggregate (`{ orderId: 1 }` unique) owns payment attempts, settlement status, provider tokens, transaction references, and refund tracking.
+   - A single Order has exactly one parent `Payment` document, which contains or links to one or more immutable `PaymentAttempt` records.
+2. **Server-Authoritative Pricing & Currencies**:
+   - Payment amount and currency are strictly sourced from `Order.total` and `Order.currency`. Client payload attempts to supply amount, currency, or userId are rejected immediately with validation errors.
+3. **Pluggable Payment Provider Architecture**:
+   - Standardized `PaymentProvider` interface decoupling business logic from third-party vendor APIs:
+     - `createPaymentIntent()`
+     - `verifyWebhookSignature()`
+     - `processWebhookEvent()`
+     - `reconcilePayment()`
+   - Built-in providers:
+     - `TestPaymentProvider` (`TEST`): HMAC-SHA256 authenticated sandbox provider with signature verification, deterministic mock outcomes, and strict production-guard disabling (`NODE_ENV === 'production' && !ENABLE_TEST_PAYMENT_PROVIDER`).
+     - `CodPaymentProvider` (`COD`): Cash on Delivery provider allowing deferred physical settlement upon shipment delivery.
+4. **Idempotent Webhook Processing & Replay Defense**:
+   - Raw request body buffer capture via `express.json` verify callback enables cryptographic HMAC signature verification without JSON parser mutation issues.
+   - Dedicated `PaymentWebhookEvent` collection with compound unique index on `{ provider: 1, providerEventId: 1 }` guarantees duplicate or retried webhook deliveries are processed idempotently with zero duplicate side effects.
+5. **Irreversible Settlement & State Downgrade Protection**:
+   - Payment Statuses: `PENDING` ➔ `PROCESSING` ➔ `SUCCEEDED` (Terminal: `CANCELLED`, `FAILED`).
+   - Succeeded payments (`SUCCEEDED` / `PAID`) cannot be downgraded by delayed or out-of-order `payment.failed` webhook packets.
+   - Simple Order cancellation (`/orders/:id/cancel`) is strictly blocked on `PAID` orders (`ERR_ORDER_PAID_CANCELLATION_REQUIRES_REFUND`), protecting warehouse inventory from unauthorized de-allocation without formal refund handling.
+6. **Immutable Payment Attempt Timeline**:
+   - Every checkout submission or retry records an isolated, numbered `PaymentAttempt` (`attemptNumber: 1, 2, ...`) tracking provider transaction references, timestamps, and normalized failure codes/messages.
+   - Maximum attempt threshold per order (`MAX_PAYMENT_ATTEMPTS_PER_ORDER = 10`) protects against automated card testing or brute-force attacks.
+
+### 12.2 Payment API Endpoint Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/payments/methods` | Public | Returns available, enabled payment methods (Online, Cash on Delivery) |
+| `POST` | `/api/v1/payments` | Yes (CUSTOMER) | Initiates payment for an existing payable order; creates/reuses attempt |
+| `GET` | `/api/v1/payments/order/:orderId` | Yes (CUSTOMER) | Retrieves customer's payment status, provider details, & attempt history |
+| `POST` | `/api/v1/webhooks/payments/:provider`| Public (Signed) | Cryptographically verified webhook ingestion endpoint for payment gateways |
+| `GET` | `/api/v1/admin/payments` | Yes (`payment:read`) | Administrative paginated search, filter by status/method/provider |
+| `GET` | `/api/v1/admin/payments/:paymentId` | Yes (`payment:read`) | Admin detailed view with full attempt timeline & transaction references |
+| `POST` | `/api/v1/admin/payments/:paymentId/confirm-cod` | Yes (`payment:confirm`) | Authoritatively marks Cash on Delivery collected and Order as PAID |
+| `POST` | `/api/v1/admin/payments/:paymentId/reconcile` | Yes (`payment:reconcile`) | Manually synchronizes payment state against upstream provider status |
+
+
 
 
 

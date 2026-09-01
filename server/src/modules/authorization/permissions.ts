@@ -67,6 +67,11 @@ export const PERMISSIONS = {
   SUPPORT_ASSIGN: 'support:assign',
   SUPPORT_CLOSE: 'support:close',
 
+  // Payments (Module 13)
+  PAYMENT_READ: 'payment:read',
+  PAYMENT_CONFIRM: 'payment:confirm',
+  PAYMENT_RECONCILE: 'payment:reconcile',
+
   // Analytics & Audit
   ANALYTICS_READ: 'analytics:read',
   AUDIT_READ: 'audit:read',

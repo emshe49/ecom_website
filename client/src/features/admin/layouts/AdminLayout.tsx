@@ -8,6 +8,7 @@ export const AdminLayout: React.FC = () => {
   const { user } = useAuthStore();
   const canManageStaff = usePermission('admin-user:read');
   const canReadOrders = usePermission('order:read');
+  const canReadPayments = usePermission('payment:read');
   const canReadCategories = usePermission('category:read');
   const canReadBrands = usePermission('brand:read');
   const canReadProducts = usePermission('product:read');
@@ -74,6 +75,25 @@ export const AdminLayout: React.FC = () => {
               <span>Orders</span>
             </NavLink>
           )}
+
+          {canReadPayments && (
+            <NavLink
+              to="/admin/payments"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+              <span>Payments</span>
+            </NavLink>
+          )}
+
 
           {canManageStaff && (
             <NavLink

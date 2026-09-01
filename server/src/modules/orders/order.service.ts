@@ -25,6 +25,7 @@ import { CheckoutSession } from '../checkout/checkout.model.js';
 import { CHECKOUT_STATUS } from '../checkout/checkout.constants.js';
 import { checkoutService } from '../checkout/checkout.service.js';
 import { inventoryService } from '../inventory/inventory.service.js';
+import { paymentService } from '../payments/payment.service.js';
 import { cartService } from '../cart/cart.service.js';
 import { User } from '../users/user.model.js';
 import { AppError } from '../../shared/errors/app-error.js';
@@ -311,7 +312,15 @@ export const orderService = {
       throw AppError.badRequest('Order is already cancelled.', ErrorCodes.ERR_ORDER_ALREADY_CANCELLED);
     }
 
+    if (order.paymentStatus === PAYMENT_STATUS.PAID) {
+      throw AppError.badRequest(
+        'Paid orders cannot be cancelled directly through simple cancellation. A refund or return workflow is required.',
+        ErrorCodes.ERR_ORDER_PAID_CANCELLATION_REQUIRES_REFUND
+      );
+    }
+
     if (!orderStatusService.canCustomerCancelOrder(order)) {
+
       throw AppError.badRequest(
         `Cannot cancel order in '${order.status}' status. Cancellation is only allowed before order is processed.`,
         ErrorCodes.ERR_ORDER_CANNOT_CANCEL
@@ -362,7 +371,11 @@ export const orderService = {
       );
     }
 
+    // Safely mark pending payment attempts as cancelled
+    await paymentService.cancelPaymentOnOrderCancellation(updated._id);
+
     logger.info(`Order ${updated.orderNumber} successfully cancelled by customer ${userId}`);
+
     return orderMapper.toOrderDetailDTO(updated);
   },
 
@@ -560,7 +573,15 @@ export const orderService = {
       throw AppError.badRequest('Order is already cancelled.', ErrorCodes.ERR_ORDER_ALREADY_CANCELLED);
     }
 
+    if (order.paymentStatus === PAYMENT_STATUS.PAID) {
+      throw AppError.badRequest(
+        'Paid orders cannot be cancelled directly through simple cancellation. A refund or return workflow is required.',
+        ErrorCodes.ERR_ORDER_PAID_CANCELLATION_REQUIRES_REFUND
+      );
+    }
+
     if (!orderStatusService.canAdminCancelOrder(order)) {
+
       throw AppError.badRequest(
         `Cannot cancel order in '${order.status}' status. Orders cannot be cancelled after shipping.`,
         ErrorCodes.ERR_ORDER_CANNOT_CANCEL
@@ -608,7 +629,11 @@ export const orderService = {
       );
     }
 
+    // Safely mark pending payment attempts as cancelled
+    await paymentService.cancelPaymentOnOrderCancellation(updated._id);
+
     logger.info(`Order ${updated.orderNumber} cancelled by admin ${adminId}. Reason: ${reason}`);
+
     return orderMapper.toAdminOrderDetailDTO(updated);
   },
 

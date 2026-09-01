@@ -117,6 +117,33 @@ export const OrderDetailsPage: React.FC = () => {
         )}
       </div>
 
+      {/* Unpaid / Pending Payment Banner */}
+      {order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED' && (
+        <div className="p-5 rounded-2xl border border-indigo-500/30 bg-indigo-500/10 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-indigo-500/5">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shrink-0">
+              <CreditCard className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-bold text-slate-100">
+                Payment Required ({formatPrice(order.total, order.currency)})
+              </h3>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Complete your payment online or confirm Cash on Delivery to finalize your order.
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to={`/orders/${order.id}/payment`}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-semibold transition-all shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 shrink-0"
+          >
+            <CreditCard className="w-4 h-4" />
+            Pay Now
+          </Link>
+        </div>
+      )}
+
       {/* Header Card */}
       <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -136,16 +163,28 @@ export const OrderDetailsPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="text-left md:text-right">
-            <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
-              Total Amount
-            </p>
-            <p className="text-2xl font-extrabold text-indigo-400 mt-0.5">
-              {formatPrice(order.total, order.currency)}
-            </p>
+          <div className="text-left md:text-right flex flex-row md:flex-col items-center md:items-end justify-between gap-2">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+                Total Amount
+              </p>
+              <p className="text-2xl font-extrabold text-indigo-400 mt-0.5">
+                {formatPrice(order.total, order.currency)}
+              </p>
+            </div>
+
+            {order.paymentStatus !== 'PAID' && order.status !== 'CANCELLED' && (
+              <Link
+                to={`/orders/${order.id}/payment`}
+                className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/20 transition-colors"
+              >
+                <CreditCard className="w-3.5 h-3.5" /> Pay Now
+              </Link>
+            )}
           </div>
         </div>
       </div>
+
 
       {/* Lifecycle Progress Tracker */}
       <OrderTimeline

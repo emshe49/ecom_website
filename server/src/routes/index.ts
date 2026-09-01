@@ -21,6 +21,11 @@ import { wishlistRouter } from '../modules/wishlist/wishlist.routes.js';
 import { inventoryRouter } from '../modules/inventory/inventory.routes.js';
 import { checkoutRouter } from '../modules/checkout/checkout.routes.js';
 import { orderRouter, adminOrderRouter } from '../modules/orders/order.routes.js';
+import {
+  paymentRoutes,
+  adminPaymentRoutes,
+} from '../modules/payments/payment.routes.js';
+import { paymentWebhookRoutes } from '../modules/payments/payment-webhook.routes.js';
 
 const apiRouter = Router();
 
@@ -56,8 +61,14 @@ v1Router.use('/checkout', checkoutRouter);
 v1Router.use('/orders', orderRouter);
 v1Router.use('/admin/orders', adminOrderRouter);
 
+// Payments & Webhook Routes (Module 13)
+v1Router.use('/payments', paymentRoutes);
+v1Router.use('/admin/payments', adminPaymentRoutes);
+v1Router.use('/webhooks', paymentWebhookRoutes);
+
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);
+
 
 
 

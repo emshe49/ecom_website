@@ -32,6 +32,10 @@ import { OrdersPage } from '../features/orders/pages/OrdersPage';
 import { OrderDetailsPage } from '../features/orders/pages/OrderDetailsPage';
 import { AdminOrdersPage } from '../features/orders/pages/AdminOrdersPage';
 import { AdminOrderDetailsPage } from '../features/orders/pages/AdminOrderDetailsPage';
+import { PaymentPage } from '../features/payments/pages/PaymentPage';
+import { PaymentResultPage } from '../features/payments/pages/PaymentResultPage';
+import { AdminPaymentsPage } from '../features/payments/pages/AdminPaymentsPage';
+import { AdminPaymentDetailsPage } from '../features/payments/pages/AdminPaymentDetailsPage';
 
 export const router = createBrowserRouter([
   {
@@ -104,6 +108,14 @@ export const router = createBrowserRouter([
             path: 'orders/:orderId',
             element: <OrderDetailsPage />,
           },
+          {
+            path: 'orders/:orderId/payment',
+            element: <PaymentPage />,
+          },
+          {
+            path: 'payment/result',
+            element: <PaymentResultPage />,
+          },
         ],
       },
 
@@ -140,6 +152,20 @@ export const router = createBrowserRouter([
               },
             ],
           },
+          {
+            element: <PermissionRoute permission="payment:read" />,
+            children: [
+              {
+                path: 'payments',
+                element: <AdminPaymentsPage />,
+              },
+              {
+                path: 'payments/:paymentId',
+                element: <AdminPaymentDetailsPage />,
+              },
+            ],
+          },
+
           {
             element: <PermissionRoute permission="admin-user:read" />,
             children: [
