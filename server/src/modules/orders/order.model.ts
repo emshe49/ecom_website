@@ -11,6 +11,8 @@ import {
   IOrderItemSnapshot,
   ICustomerSnapshot,
   IOrderStatusHistory,
+  IOrderCouponSnapshot,
+  IOrderPromotionSnapshot,
 } from './order.types.js';
 import {
   ICheckoutAddressSnapshot,
@@ -32,6 +34,11 @@ export interface IOrder extends Document {
   shippingMethod?: ICheckoutShippingMethodSnapshot;
   shippingFee: number;
   subtotal: number;
+  couponDiscountAmount: number;
+  promotionDiscountAmount: number;
+  discountAmount: number;
+  coupon?: IOrderCouponSnapshot | null;
+  promotion?: IOrderPromotionSnapshot | null;
   total: number;
   currency: string;
   customerNotes?: string | null;
@@ -108,6 +115,28 @@ const orderItemSnapshotSchema = new Schema<IOrderItemSnapshot>(
         validator: Number.isInteger,
         message: '{VALUE} is not an integer value for line total.',
       },
+    },
+    couponDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    promotionDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    finalLineTotal: {
+      type: Number,
+      default: function (this: IOrderItemSnapshot) {
+        return this.lineTotal - (this.discountAmount || 0);
+      },
+      min: 0,
     },
   },
   { _id: false }
@@ -347,6 +376,56 @@ const orderSchema = new Schema<IOrder>(
         validator: Number.isInteger,
         message: '{VALUE} is not an integer value for subtotal.',
       },
+    },
+    couponDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for coupon discount.',
+      },
+    },
+    promotionDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for promotion discount.',
+      },
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for total discount.',
+      },
+    },
+    coupon: {
+      type: {
+        couponId: { type: Schema.Types.ObjectId, ref: 'Coupon', required: true },
+        code: { type: String, required: true },
+        name: { type: String, required: true },
+        discountType: { type: String, required: true },
+        discountValue: { type: Number, required: true },
+        discountAmount: { type: Number, required: true },
+      },
+      default: null,
+      _id: false,
+    },
+    promotion: {
+      type: {
+        promotionId: { type: Schema.Types.ObjectId, ref: 'Promotion', required: true },
+        name: { type: String, required: true },
+        discountType: { type: String, required: true },
+        discountValue: { type: Number, required: true },
+        discountAmount: { type: Number, required: true },
+      },
+      default: null,
+      _id: false,
     },
     total: {
       type: Number,

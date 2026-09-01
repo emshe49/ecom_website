@@ -24,6 +24,10 @@ export interface CheckoutItemSnapshotDTO {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  couponDiscountAmount?: number;
+  promotionDiscountAmount?: number;
+  discountAmount?: number;
+  finalLineTotal?: number;
 }
 
 export interface CheckoutShippingMethodSnapshotDTO {
@@ -36,6 +40,23 @@ export interface CheckoutShippingMethodSnapshotDTO {
   estimatedMaxDays: number;
 }
 
+export interface CheckoutCouponSnapshotDTO {
+  couponId: string;
+  code: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
+export interface CheckoutPromotionSnapshotDTO {
+  promotionId: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
 export interface CheckoutSessionDTO {
   id: string;
   userId: string;
@@ -46,6 +67,11 @@ export interface CheckoutSessionDTO {
   shippingMethod?: CheckoutShippingMethodSnapshotDTO | null;
   shippingFee: number;
   subtotal: number;
+  couponDiscountAmount: number;
+  promotionDiscountAmount: number;
+  discountAmount: number;
+  coupon?: CheckoutCouponSnapshotDTO | null;
+  promotion?: CheckoutPromotionSnapshotDTO | null;
   total: number;
   currency: string;
   expiresAt: string;

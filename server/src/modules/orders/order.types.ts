@@ -18,6 +18,10 @@ export interface IOrderItemSnapshot {
   quantity: number;
   unitPrice: number; // minor units
   lineTotal: number; // minor units
+  couponDiscountAmount?: number;
+  promotionDiscountAmount?: number;
+  discountAmount?: number;
+  finalLineTotal?: number;
 }
 
 export interface ICustomerSnapshot {
@@ -35,6 +39,23 @@ export interface IOrderStatusHistory {
   changedAt: Date;
 }
 
+export interface IOrderCouponSnapshot {
+  couponId: Types.ObjectId;
+  code: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
+export interface IOrderPromotionSnapshot {
+  promotionId: Types.ObjectId;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
 export interface OrderItemDTO {
   productId: string;
   variantId: string;
@@ -46,6 +67,10 @@ export interface OrderItemDTO {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  couponDiscountAmount: number;
+  promotionDiscountAmount: number;
+  discountAmount: number;
+  finalLineTotal: number;
 }
 
 export interface CustomerSnapshotDTO {
@@ -86,6 +111,23 @@ export interface OrderShippingMethodDTO {
   estimatedMaxDays: number;
 }
 
+export interface OrderCouponSnapshotDTO {
+  couponId: string;
+  code: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
+export interface OrderPromotionSnapshotDTO {
+  promotionId: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
 export interface OrderSummaryDTO {
   id: string;
   orderNumber: string;
@@ -95,6 +137,7 @@ export interface OrderSummaryDTO {
   itemCount: number;
   totalQuantity: number;
   subtotal: number;
+  discountAmount: number;
   shippingFee: number;
   total: number;
   currency: string;
@@ -114,6 +157,11 @@ export interface OrderDetailDTO {
   shippingMethod?: OrderShippingMethodDTO | null;
   shippingFee: number;
   subtotal: number;
+  couponDiscountAmount: number;
+  promotionDiscountAmount: number;
+  discountAmount: number;
+  coupon?: OrderCouponSnapshotDTO | null;
+  promotion?: OrderPromotionSnapshotDTO | null;
   total: number;
   currency: string;
   customerNotes?: string | null;

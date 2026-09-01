@@ -30,6 +30,7 @@ import { cartService } from '../cart/cart.service.js';
 import { User } from '../users/user.model.js';
 import { Shipment } from '../shipping/shipment.model.js';
 import { SHIPMENT_STATUS } from '../shipping/shipping.constants.js';
+import { redemptionService } from '../promotions/redemption.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
@@ -146,9 +147,31 @@ export const orderService = {
         : undefined,
       shippingFee: validatedSession.shippingFee || 0,
       subtotal: validatedSession.subtotal,
+      couponDiscountAmount: validatedSession.couponDiscountAmount || 0,
+      promotionDiscountAmount: validatedSession.promotionDiscountAmount || 0,
+      discountAmount: validatedSession.discountAmount || 0,
+      coupon: validatedSession.coupon
+        ? {
+            couponId: validatedSession.coupon.couponId,
+            code: validatedSession.coupon.code,
+            name: validatedSession.coupon.name,
+            discountType: validatedSession.coupon.discountType,
+            discountValue: validatedSession.coupon.discountValue,
+            discountAmount: validatedSession.coupon.discountAmount,
+          }
+        : null,
+      promotion: validatedSession.promotion
+        ? {
+            promotionId: validatedSession.promotion.promotionId,
+            name: validatedSession.promotion.name,
+            discountType: validatedSession.promotion.discountType,
+            discountValue: validatedSession.promotion.discountValue,
+            discountAmount: validatedSession.promotion.discountAmount,
+          }
+        : null,
       total:
         validatedSession.total ||
-        validatedSession.subtotal + (validatedSession.shippingFee || 0),
+        validatedSession.subtotal - (validatedSession.discountAmount || 0) + (validatedSession.shippingFee || 0),
       currency: validatedSession.currency,
       customerNotes: input.customerNotes ? input.customerNotes.trim() : null,
       statusHistory: [
@@ -204,6 +227,22 @@ export const orderService = {
 
     // 10. Persist Order
     await newOrder.save();
+
+    // 10b. Record Coupon Redemption if applicable
+    if (validatedSession.coupon) {
+      try {
+        await redemptionService.recordRedemption(
+          validatedSession.coupon.couponId,
+          customerObjId,
+          newOrder._id,
+          validatedSession.coupon.code,
+          validatedSession.coupon.discountAmount,
+          validatedSession._id
+        );
+      } catch (err: unknown) {
+        logger.error(`Failed to record coupon redemption for order ${orderNumber}: ${String(err)}`);
+      }
+    }
 
     // 11. Complete CheckoutSession
     validatedSession.status = CHECKOUT_STATUS.COMPLETED;
@@ -406,6 +445,18 @@ export const orderService = {
 
     // Safely mark pending payment attempts as cancelled
     await paymentService.cancelPaymentOnOrderCancellation(updated._id);
+
+    // Reverse coupon redemption if applicable
+    try {
+      await redemptionService.reverseRedemptionOnOrderCancellation(
+        updated._id,
+        `Customer order cancellation: ${reason}`
+      );
+    } catch (err: unknown) {
+      logger.error(
+        `Failed to reverse coupon redemption for cancelled order ${updated.orderNumber}: ${String(err)}`
+      );
+    }
 
     // Cancel pending shipment if one exists
     if (existingShipment && existingShipment.status !== SHIPMENT_STATUS.CANCELLED) {

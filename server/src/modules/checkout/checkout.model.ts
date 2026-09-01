@@ -12,6 +12,10 @@ export interface ICheckoutItemSnapshot {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  couponDiscountAmount?: number;
+  promotionDiscountAmount?: number;
+  discountAmount?: number;
+  finalLineTotal?: number;
 }
 
 export interface ICheckoutAddressSnapshot {
@@ -37,6 +41,23 @@ export interface ICheckoutShippingMethodSnapshot {
   estimatedMaxDays: number;
 }
 
+export interface ICheckoutCouponSnapshot {
+  couponId: Types.ObjectId;
+  code: string;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
+export interface ICheckoutPromotionSnapshot {
+  promotionId: Types.ObjectId;
+  name: string;
+  discountType: string;
+  discountValue: number;
+  discountAmount: number;
+}
+
 export interface ICheckoutSession extends Document {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
@@ -47,6 +68,11 @@ export interface ICheckoutSession extends Document {
   shippingMethod?: ICheckoutShippingMethodSnapshot;
   shippingFee: number;
   subtotal: number;
+  couponDiscountAmount: number;
+  promotionDiscountAmount: number;
+  discountAmount: number;
+  coupon?: ICheckoutCouponSnapshot | null;
+  promotion?: ICheckoutPromotionSnapshot | null;
   total: number;
   currency: string;
   inventoryReserved: boolean;
@@ -122,6 +148,28 @@ const checkoutItemSnapshotSchema = new Schema<ICheckoutItemSnapshot>(
         validator: Number.isInteger,
         message: '{VALUE} is not an integer value for line total.',
       },
+    },
+    couponDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    promotionDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    finalLineTotal: {
+      type: Number,
+      default: function (this: ICheckoutItemSnapshot) {
+        return this.lineTotal - (this.discountAmount || 0);
+      },
+      min: 0,
     },
   },
   { _id: false }
@@ -283,6 +331,56 @@ const checkoutSessionSchema = new Schema<ICheckoutSession>(
         validator: Number.isInteger,
         message: '{VALUE} is not an integer value for subtotal.',
       },
+    },
+    couponDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for coupon discount.',
+      },
+    },
+    promotionDiscountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for promotion discount.',
+      },
+    },
+    discountAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for total discount.',
+      },
+    },
+    coupon: {
+      type: {
+        couponId: { type: Schema.Types.ObjectId, ref: 'Coupon', required: true },
+        code: { type: String, required: true },
+        name: { type: String, required: true },
+        discountType: { type: String, required: true },
+        discountValue: { type: Number, required: true },
+        discountAmount: { type: Number, required: true },
+      },
+      default: null,
+      _id: false,
+    },
+    promotion: {
+      type: {
+        promotionId: { type: Schema.Types.ObjectId, ref: 'Promotion', required: true },
+        name: { type: String, required: true },
+        discountType: { type: String, required: true },
+        discountValue: { type: Number, required: true },
+        discountAmount: { type: Number, required: true },
+      },
+      default: null,
+      _id: false,
     },
     total: {
       type: Number,

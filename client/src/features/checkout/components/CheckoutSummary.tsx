@@ -1,8 +1,9 @@
 import React from 'react';
-import { ShoppingBag, ShieldCheck, MapPin, XCircle, RefreshCw, AlertCircle } from 'lucide-react';
+import { ShoppingBag, ShieldCheck, MapPin, XCircle, RefreshCw, AlertCircle, Sparkles, Tag } from 'lucide-react';
 import { CheckoutSession } from '../types/checkout.types';
 import { CheckoutItem } from './CheckoutItem';
 import { CheckoutCountdown } from './CheckoutCountdown';
+import { CouponInput } from '../../promotions/components/CouponInput';
 import { formatMoney } from '../../../utils/money';
 
 interface CheckoutSummaryProps {
@@ -14,6 +15,8 @@ interface CheckoutSummaryProps {
   onPlaceOrder: (customerNotes?: string) => void;
   isPlacingOrder: boolean;
   onExpired: () => void;
+  onApplyCoupon: (code: string) => Promise<void>;
+  onRemoveCoupon: () => Promise<void>;
   errorMessage?: string | null;
 }
 
@@ -26,9 +29,15 @@ export const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
   onPlaceOrder,
   isPlacingOrder,
   onExpired,
+  onApplyCoupon,
+  onRemoveCoupon,
   errorMessage,
 }) => {
   const [customerNotes, setCustomerNotes] = React.useState('');
+
+  const promotionDiscount = session.promotionDiscountAmount || 0;
+  const couponDiscount = session.couponDiscountAmount || 0;
+  const totalDiscount = session.discountAmount || (promotionDiscount + couponDiscount);
 
   return (
     <div className="space-y-6 animate-fadeIn">
@@ -145,6 +154,15 @@ export const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
 
         {/* Right: Checkout Subtotal & Action Bar */}
         <div className="lg:col-span-1 space-y-4">
+          {/* Coupon Input Widget */}
+          <CouponInput
+            appliedCoupon={session.coupon}
+            currency={session.currency}
+            onApplyCoupon={onApplyCoupon}
+            onRemoveCoupon={onRemoveCoupon}
+            disabled={isPlacingOrder || isCancelling || isRevalidating}
+          />
+
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl sticky top-24 backdrop-blur-md">
             <h3 className="text-base font-bold text-white border-b border-slate-800 pb-3">
               Payment Summary
@@ -157,6 +175,34 @@ export const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
                   {formatMoney(session.subtotal, session.currency)}
                 </span>
               </div>
+
+              {/* Automatic Promotion Breakdown */}
+              {session.promotion && (
+                <div className="flex justify-between text-emerald-400 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Promotion ({session.promotion.name})</span>
+                  </span>
+                  <span className="font-mono font-semibold">
+                    -{formatMoney(promotionDiscount, session.currency)}
+                  </span>
+                </div>
+              )}
+
+              {/* Coupon Discount Breakdown */}
+              {session.coupon && (
+                <div className="flex justify-between text-indigo-400 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5" />
+                    <span>Coupon ({session.coupon.code})</span>
+                  </span>
+                  <span className="font-mono font-semibold">
+                    -{formatMoney(couponDiscount, session.currency)}
+                  </span>
+                </div>
+              )}
+
+              {/* Shipping Fee */}
               <div className="flex justify-between text-slate-400">
                 <span>Shipping ({session.shippingMethod?.name || 'Standard'})</span>
                 {session.shippingFee > 0 ? (
@@ -167,15 +213,24 @@ export const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
                   <span className="text-emerald-400 font-semibold">FREE</span>
                 )}
               </div>
+
               <div className="flex justify-between text-slate-400">
                 <span>Estimated Tax</span>
                 <span className="text-[11px] italic">Included</span>
               </div>
 
+              {/* Total Summary Row */}
               <div className="pt-3 border-t border-slate-800 flex justify-between items-baseline">
-                <span className="text-sm font-bold text-white">Total Amount</span>
+                <div>
+                  <span className="text-sm font-bold text-white block">Total Amount</span>
+                  {totalDiscount > 0 && (
+                    <span className="text-[11px] text-emerald-400 font-mono">
+                      Total savings: {formatMoney(totalDiscount, session.currency)}
+                    </span>
+                  )}
+                </div>
                 <span className="text-2xl font-black text-emerald-400 font-mono">
-                  {formatMoney(session.total ?? (session.subtotal + (session.shippingFee || 0)), session.currency)}
+                  {formatMoney(session.total ?? (session.subtotal - totalDiscount + (session.shippingFee || 0)), session.currency)}
                 </span>
               </div>
             </div>
@@ -234,4 +289,3 @@ export const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
     </div>
   );
 };
-

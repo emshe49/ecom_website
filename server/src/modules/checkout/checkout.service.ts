@@ -22,6 +22,8 @@ import {
 } from './checkout.model.js';
 import { toAddressSnapshot, toCheckoutSessionDTO } from './checkout.mapper.js';
 import { CheckoutSessionDTO, CreateCheckoutInputDTO } from './checkout.types.js';
+import { discountEngineService } from '../promotions/discount-engine.service.js';
+import { DiscountContext } from '../promotions/promotion.types.js';
 
 export class CheckoutService {
   /**
@@ -294,7 +296,41 @@ export class CheckoutService {
     }
 
     const shippingFee = shippingMethodSnapshot.fee;
-    const total = subtotal + shippingFee;
+
+    // 8b. Evaluate Automatic Promotions
+    const discountContext: DiscountContext = {
+      userId: uId,
+      items: itemSnapshots.map((item) => {
+        const variant = variantMap.get(item.variantId.toString());
+        const product = variant ? productMap.get(variant.productId.toString()) : undefined;
+        return {
+          productId: item.productId,
+          variantId: item.variantId,
+          categoryId: product?.categoryId ? new Types.ObjectId(product.categoryId) : null,
+          brandId: product?.brandId ? new Types.ObjectId(product.brandId) : null,
+          productName: item.productName,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal,
+        };
+      }),
+      subtotal,
+      shippingFee,
+      currentTime: new Date(),
+    };
+
+    const discountResult = await discountEngineService.evaluateDiscounts(discountContext, null);
+
+    for (const item of itemSnapshots) {
+      const alloc = discountResult.itemAllocations.find((a) => a.variantId === item.variantId.toString());
+      item.couponDiscountAmount = alloc?.couponDiscountAmount || 0;
+      item.promotionDiscountAmount = alloc?.promotionDiscountAmount || 0;
+      item.discountAmount = alloc?.discountAmount || 0;
+      item.finalLineTotal = alloc?.finalLineTotal ?? (item.lineTotal - (item.discountAmount || 0));
+    }
+
+    const total = subtotal - discountResult.discountAmount + shippingFee;
 
     // 9. Create and persist CheckoutSession
     const ttlMinutes = env.CHECKOUT_SESSION_TTL_MINUTES || DEFAULT_CHECKOUT_TTL_MINUTES;
@@ -310,6 +346,11 @@ export class CheckoutService {
       shippingMethod: shippingMethodSnapshot,
       shippingFee,
       subtotal,
+      couponDiscountAmount: discountResult.couponDiscountAmount,
+      promotionDiscountAmount: discountResult.promotionDiscountAmount,
+      discountAmount: discountResult.discountAmount,
+      coupon: discountResult.coupon,
+      promotion: discountResult.promotion,
       total,
       currency: env.STORE_CURRENCY || 'PKR',
       inventoryReserved: true,
@@ -476,11 +517,230 @@ export class CheckoutService {
       }
     }
 
-    session.total = session.subtotal + (session.shippingFee || 0);
+    // Revalidate discounts (Promotions and Coupon)
+    const discountContext: DiscountContext = {
+      userId: uId,
+      items: session.items.map((item) => {
+        const variant = variantMap.get(item.variantId.toString());
+        const product = variant ? productMap.get(variant.productId.toString()) : undefined;
+        return {
+          productId: item.productId,
+          variantId: item.variantId,
+          categoryId: product?.categoryId ? new Types.ObjectId(product.categoryId) : null,
+          brandId: product?.brandId ? new Types.ObjectId(product.brandId) : null,
+          productName: item.productName,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal,
+        };
+      }),
+      subtotal: session.subtotal,
+      shippingFee: session.shippingFee,
+      currentTime: new Date(),
+    };
+
+    let discountResult;
+    try {
+      discountResult = await discountEngineService.evaluateDiscounts(
+        discountContext,
+        session.coupon?.code || null
+      );
+    } catch {
+      // If previously applied coupon is no longer valid, fallback to evaluating automatic promotions without coupon
+      discountResult = await discountEngineService.evaluateDiscounts(discountContext, null);
+      if (session.coupon) {
+        hasPriceChanges = true;
+      }
+    }
+
+    if (session.discountAmount !== discountResult.discountAmount) {
+      hasPriceChanges = true;
+    }
+
+    session.coupon = discountResult.coupon;
+    session.promotion = discountResult.promotion;
+    session.couponDiscountAmount = discountResult.couponDiscountAmount;
+    session.promotionDiscountAmount = discountResult.promotionDiscountAmount;
+    session.discountAmount = discountResult.discountAmount;
+
+    for (const item of session.items) {
+      const alloc = discountResult.itemAllocations.find((a) => a.variantId === item.variantId.toString());
+      item.couponDiscountAmount = alloc?.couponDiscountAmount || 0;
+      item.promotionDiscountAmount = alloc?.promotionDiscountAmount || 0;
+      item.discountAmount = alloc?.discountAmount || 0;
+      item.finalLineTotal = alloc?.finalLineTotal ?? (item.lineTotal - (item.discountAmount || 0));
+    }
+
+    session.total = session.subtotal - session.discountAmount + (session.shippingFee || 0);
     session.lastValidatedAt = new Date();
     await session.save();
 
     return toCheckoutSessionDTO(session, hasPriceChanges || hasShippingChanges);
+  }
+
+  /**
+   * Applies a coupon code to the current active checkout session.
+   * Does NOT consume coupon usage. Revalidates pricing and updates snapshots.
+   */
+  async applyCouponToCheckout(userId: string, code: string): Promise<CheckoutSessionDTO> {
+    const uId = new Types.ObjectId(userId);
+    const session = await CheckoutSession.findOne({
+      userId: uId,
+      status: CHECKOUT_STATUS.ACTIVE,
+    });
+
+    if (!session) {
+      throw AppError.notFound('No active checkout session found.', ErrorCodes.ERR_CHECKOUT_NOT_FOUND);
+    }
+
+    if (new Date(session.expiresAt).getTime() <= Date.now()) {
+      await this.expireCheckoutSession(session);
+      throw new AppError(
+        'Checkout session has expired. Please initiate checkout again.',
+        410,
+        ErrorCodes.ERR_CHECKOUT_EXPIRED
+      );
+    }
+
+    // Check if same coupon code already applied
+    if (session.coupon && session.coupon.code.toUpperCase() === code.trim().toUpperCase()) {
+      throw AppError.badRequest('This coupon is already applied to your checkout.', ErrorCodes.ERR_COUPON_ALREADY_APPLIED);
+    }
+
+    // Build context
+    const variantIds = session.items.map((i) => i.variantId);
+    const variants = await ProductVariant.find({ _id: { $in: variantIds } });
+    const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
+
+    const productIds = session.items.map((i) => i.productId);
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+    const discountContext: DiscountContext = {
+      userId: uId,
+      items: session.items.map((item) => {
+        const variant = variantMap.get(item.variantId.toString());
+        const product = variant ? productMap.get(variant.productId.toString()) : undefined;
+        return {
+          productId: item.productId,
+          variantId: item.variantId,
+          categoryId: product?.categoryId ? new Types.ObjectId(product.categoryId) : null,
+          brandId: product?.brandId ? new Types.ObjectId(product.brandId) : null,
+          productName: item.productName,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal,
+        };
+      }),
+      subtotal: session.subtotal,
+      shippingFee: session.shippingFee,
+      currentTime: new Date(),
+    };
+
+    const discountResult = await discountEngineService.evaluateDiscounts(discountContext, code);
+
+    if (!discountResult.coupon) {
+      throw AppError.badRequest('Coupon could not be applied or was superseded by a promotion.', ErrorCodes.ERR_COUPON_NOT_APPLICABLE);
+    }
+
+    session.coupon = discountResult.coupon;
+    session.promotion = discountResult.promotion;
+    session.couponDiscountAmount = discountResult.couponDiscountAmount;
+    session.promotionDiscountAmount = discountResult.promotionDiscountAmount;
+    session.discountAmount = discountResult.discountAmount;
+
+    for (const item of session.items) {
+      const alloc = discountResult.itemAllocations.find((a) => a.variantId === item.variantId.toString());
+      item.couponDiscountAmount = alloc?.couponDiscountAmount || 0;
+      item.promotionDiscountAmount = alloc?.promotionDiscountAmount || 0;
+      item.discountAmount = alloc?.discountAmount || 0;
+      item.finalLineTotal = alloc?.finalLineTotal ?? (item.lineTotal - (item.discountAmount || 0));
+    }
+
+    session.total = session.subtotal - session.discountAmount + (session.shippingFee || 0);
+    session.lastValidatedAt = new Date();
+    await session.save();
+
+    return toCheckoutSessionDTO(session);
+  }
+
+  /**
+   * Removes currently applied coupon from the active checkout session and recalculates totals.
+   */
+  async removeCouponFromCheckout(userId: string): Promise<CheckoutSessionDTO> {
+    const uId = new Types.ObjectId(userId);
+    const session = await CheckoutSession.findOne({
+      userId: uId,
+      status: CHECKOUT_STATUS.ACTIVE,
+    });
+
+    if (!session) {
+      throw AppError.notFound('No active checkout session found.', ErrorCodes.ERR_CHECKOUT_NOT_FOUND);
+    }
+
+    if (new Date(session.expiresAt).getTime() <= Date.now()) {
+      await this.expireCheckoutSession(session);
+      throw new AppError(
+        'Checkout session has expired. Please initiate checkout again.',
+        410,
+        ErrorCodes.ERR_CHECKOUT_EXPIRED
+      );
+    }
+
+    // Build context
+    const variantIds = session.items.map((i) => i.variantId);
+    const variants = await ProductVariant.find({ _id: { $in: variantIds } });
+    const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
+
+    const productIds = session.items.map((i) => i.productId);
+    const products = await Product.find({ _id: { $in: productIds } });
+    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+    const discountContext: DiscountContext = {
+      userId: uId,
+      items: session.items.map((item) => {
+        const variant = variantMap.get(item.variantId.toString());
+        const product = variant ? productMap.get(variant.productId.toString()) : undefined;
+        return {
+          productId: item.productId,
+          variantId: item.variantId,
+          categoryId: product?.categoryId ? new Types.ObjectId(product.categoryId) : null,
+          brandId: product?.brandId ? new Types.ObjectId(product.brandId) : null,
+          productName: item.productName,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          lineTotal: item.lineTotal,
+        };
+      }),
+      subtotal: session.subtotal,
+      shippingFee: session.shippingFee,
+      currentTime: new Date(),
+    };
+
+    const discountResult = await discountEngineService.evaluateDiscounts(discountContext, null);
+
+    session.coupon = null;
+    session.promotion = discountResult.promotion;
+    session.couponDiscountAmount = 0;
+    session.promotionDiscountAmount = discountResult.promotionDiscountAmount;
+    session.discountAmount = discountResult.discountAmount;
+
+    for (const item of session.items) {
+      const alloc = discountResult.itemAllocations.find((a) => a.variantId === item.variantId.toString());
+      item.couponDiscountAmount = 0;
+      item.promotionDiscountAmount = alloc?.promotionDiscountAmount || 0;
+      item.discountAmount = alloc?.discountAmount || 0;
+      item.finalLineTotal = alloc?.finalLineTotal ?? (item.lineTotal - (item.discountAmount || 0));
+    }
+
+    session.total = session.subtotal - session.discountAmount + (session.shippingFee || 0);
+    session.lastValidatedAt = new Date();
+    await session.save();
+
+    return toCheckoutSessionDTO(session);
   }
 
   /**

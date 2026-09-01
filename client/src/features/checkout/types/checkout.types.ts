@@ -29,6 +29,20 @@ export interface CheckoutItemSnapshot {
   quantity: number;
   unitPrice: number;
   lineTotal: number;
+  couponDiscountAmount?: number;
+  promotionDiscountAmount?: number;
+  discountAmount?: number;
+  finalLineTotal?: number;
+}
+
+export interface CheckoutDiscountSnapshot {
+  couponId?: string;
+  promotionId?: string;
+  code?: string;
+  name: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+  discountAmount: number;
 }
 
 export interface CheckoutSession {
@@ -49,6 +63,11 @@ export interface CheckoutSession {
   };
   shippingFee: number;
   subtotal: number;
+  couponDiscountAmount?: number;
+  promotionDiscountAmount?: number;
+  discountAmount?: number;
+  coupon?: CheckoutDiscountSnapshot | null;
+  promotion?: CheckoutDiscountSnapshot | null;
   total: number;
   currency: string;
   expiresAt: string;

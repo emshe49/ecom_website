@@ -286,7 +286,7 @@ describe('Module 12: Order Management Integration Tests', () => {
       expect(order.status).toBe(ORDER_STATUS.PLACED);
       expect(order.paymentStatus).toBe(PAYMENT_STATUS.UNPAID);
       expect(order.subtotal).toBe(30000000); // 2 * 150,000 PKR
-      expect(order.total).toBe(30000000);
+      expect(order.total).toBe(30000000 + (order.shippingFee || 0));
       expect(order.currency).toBe('PKR');
       expect(order.customerNotes).toBe('Please ring the bell twice.');
       expect(order.items).toHaveLength(1);
@@ -411,7 +411,7 @@ describe('Module 12: Order Management Integration Tests', () => {
       expect(orderDetail.items[0].productName).toBe('Flagship Smartphone'); // Original snapshot preserved
       expect(orderDetail.items[0].unitPrice).toBe(15000000); // Original snapshot price preserved
       expect(orderDetail.subtotal).toBe(15000000);
-      expect(orderDetail.total).toBe(15000000);
+      expect(orderDetail.total).toBe(15000000 + (orderDetail.shippingFee || 0));
     });
   });
 

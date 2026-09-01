@@ -39,6 +39,10 @@ export function toCheckoutSessionDTO(
     quantity: item.quantity,
     unitPrice: item.unitPrice,
     lineTotal: item.lineTotal,
+    couponDiscountAmount: item.couponDiscountAmount ?? 0,
+    promotionDiscountAmount: item.promotionDiscountAmount ?? 0,
+    discountAmount: item.discountAmount ?? 0,
+    finalLineTotal: item.finalLineTotal ?? (item.lineTotal - (item.discountAmount ?? 0)),
   }));
 
   const shippingAddress: CheckoutAddressSnapshotDTO = {
@@ -87,7 +91,29 @@ export function toCheckoutSessionDTO(
       : null,
     shippingFee: session.shippingFee ?? 0,
     subtotal: session.subtotal,
-    total: session.total ?? session.subtotal + (session.shippingFee ?? 0),
+    couponDiscountAmount: session.couponDiscountAmount ?? 0,
+    promotionDiscountAmount: session.promotionDiscountAmount ?? 0,
+    discountAmount: session.discountAmount ?? 0,
+    coupon: session.coupon
+      ? {
+          couponId: session.coupon.couponId.toString(),
+          code: session.coupon.code,
+          name: session.coupon.name,
+          discountType: session.coupon.discountType,
+          discountValue: session.coupon.discountValue,
+          discountAmount: session.coupon.discountAmount,
+        }
+      : null,
+    promotion: session.promotion
+      ? {
+          promotionId: session.promotion.promotionId.toString(),
+          name: session.promotion.name,
+          discountType: session.promotion.discountType,
+          discountValue: session.promotion.discountValue,
+          discountAmount: session.promotion.discountAmount,
+        }
+      : null,
+    total: session.total ?? session.subtotal - (session.discountAmount ?? 0) + (session.shippingFee ?? 0),
     currency: session.currency,
     expiresAt: session.expiresAt.toISOString(),
     remainingSeconds,

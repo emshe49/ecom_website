@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ShoppingBag, ArrowLeft, ArrowRight, Loader2, AlertCircle, ShieldCheck, Truck } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { checkoutApi } from '../api/checkout.api';
+import { promotionsApi } from '../../promotions/api/promotions.api';
 import { ordersApi } from '../../orders/api/orders.api';
 import { cartApi } from '../../cart/api/cart.api';
 
@@ -156,6 +157,24 @@ export const CheckoutPage: React.FC = () => {
     },
   });
 
+  // Apply Coupon Mutation
+  const applyCouponMutation = useMutation({
+    mutationFn: (code: string) => promotionsApi.applyCoupon(code),
+    onSuccess: (updatedSession) => {
+      queryClient.setQueryData(['checkout'], updatedSession);
+      setErrorMessage(null);
+    },
+  });
+
+  // Remove Coupon Mutation
+  const removeCouponMutation = useMutation({
+    mutationFn: () => promotionsApi.removeCoupon(),
+    onSuccess: (updatedSession) => {
+      queryClient.setQueryData(['checkout'], updatedSession);
+      setErrorMessage(null);
+    },
+  });
+
   const handleStartCheckout = () => {
     if (!selectedShippingId) {
       setErrorMessage('Please select a shipping address before proceeding.');
@@ -229,6 +248,12 @@ export const CheckoutPage: React.FC = () => {
           onPlaceOrder={(notes) => placeOrderMutation.mutate(notes)}
           isPlacingOrder={placeOrderMutation.isPending}
           onExpired={() => setIsSessionExpired(true)}
+          onApplyCoupon={async (code) => {
+            await applyCouponMutation.mutateAsync(code);
+          }}
+          onRemoveCoupon={async () => {
+            await removeCouponMutation.mutateAsync();
+          }}
           errorMessage={errorMessage}
         />
       </div>

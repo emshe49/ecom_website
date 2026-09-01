@@ -33,6 +33,11 @@ import {
 } from '../modules/shipping/admin-shipping.routes.js';
 import { reviewRouter } from '../modules/reviews/review.routes.js';
 import { adminReviewRouter } from '../modules/reviews/admin-review.routes.js';
+import { promotionRouter } from '../modules/promotions/promotion.routes.js';
+import {
+  adminCouponRouter,
+  adminPromotionRouter,
+} from '../modules/promotions/admin-promotion.routes.js';
 
 const apiRouter = Router();
 
@@ -61,8 +66,9 @@ v1Router.use('/cart', cartRouter);
 // Wishlist Routes (Module 09)
 v1Router.use('/wishlist', wishlistRouter);
 
-// Checkout Routes (Module 11)
+// Checkout Routes (Module 11 & Module 16 coupon endpoints)
 v1Router.use('/checkout', checkoutRouter);
+v1Router.use('/checkout', promotionRouter);
 
 // Orders Routes (Module 12)
 v1Router.use('/orders', orderRouter);
@@ -82,12 +88,12 @@ v1Router.use('/admin/shipments', adminShipmentRouter);
 v1Router.use('/reviews', reviewRouter);
 v1Router.use('/admin/reviews', adminReviewRouter);
 
+// Coupons & Promotions Routes (Module 16)
+v1Router.use('/admin/coupons', adminCouponRouter);
+v1Router.use('/admin/promotions', adminPromotionRouter);
+
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);
-
-
-
-
 
 export default apiRouter;
 

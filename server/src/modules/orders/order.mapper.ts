@@ -22,6 +22,10 @@ export const orderMapper = {
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       lineTotal: item.lineTotal,
+      couponDiscountAmount: item.couponDiscountAmount ?? 0,
+      promotionDiscountAmount: item.promotionDiscountAmount ?? 0,
+      discountAmount: item.discountAmount ?? 0,
+      finalLineTotal: item.finalLineTotal ?? (item.lineTotal - (item.discountAmount ?? 0)),
     };
   },
 
@@ -64,6 +68,7 @@ export const orderMapper = {
       itemCount: order.items.length,
       totalQuantity,
       subtotal: order.subtotal,
+      discountAmount: order.discountAmount ?? 0,
       shippingFee: order.shippingFee ?? 0,
       total: order.total,
       currency: order.currency,
@@ -95,6 +100,28 @@ export const orderMapper = {
         : null,
       shippingFee: order.shippingFee ?? 0,
       subtotal: order.subtotal,
+      couponDiscountAmount: order.couponDiscountAmount ?? 0,
+      promotionDiscountAmount: order.promotionDiscountAmount ?? 0,
+      discountAmount: order.discountAmount ?? 0,
+      coupon: order.coupon
+        ? {
+            couponId: order.coupon.couponId.toString(),
+            code: order.coupon.code,
+            name: order.coupon.name,
+            discountType: order.coupon.discountType,
+            discountValue: order.coupon.discountValue,
+            discountAmount: order.coupon.discountAmount,
+          }
+        : null,
+      promotion: order.promotion
+        ? {
+            promotionId: order.promotion.promotionId.toString(),
+            name: order.promotion.name,
+            discountType: order.promotion.discountType,
+            discountValue: order.promotion.discountValue,
+            discountAmount: order.promotion.discountAmount,
+          }
+        : null,
       total: order.total,
       currency: order.currency,
       customerNotes: order.customerNotes || null,

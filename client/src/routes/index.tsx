@@ -42,6 +42,9 @@ import { AdminShipmentDetailsPage } from '../features/shipping/pages/AdminShipme
 import { MyReviewsPage } from '../features/reviews/pages/MyReviewsPage';
 import { AdminReviewsPage } from '../features/reviews/pages/AdminReviewsPage';
 import { AdminReviewDetailsPage } from '../features/reviews/pages/AdminReviewDetailsPage';
+import { AdminCouponsPage } from '../features/admin/promotions/pages/AdminCouponsPage';
+import { AdminCouponDetailsPage } from '../features/admin/promotions/pages/AdminCouponDetailsPage';
+import { AdminPromotionsPage } from '../features/admin/promotions/pages/AdminPromotionsPage';
 
 export const router = createBrowserRouter([
   {
@@ -211,6 +214,28 @@ export const router = createBrowserRouter([
               {
                 path: 'reviews/:reviewId',
                 element: <AdminReviewDetailsPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute anyPermissions={['coupon:read', 'coupon:manage']} />,
+            children: [
+              {
+                path: 'coupons',
+                element: <AdminCouponsPage />,
+              },
+              {
+                path: 'coupons/:couponId',
+                element: <AdminCouponDetailsPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute anyPermissions={['promotion:read', 'promotion:manage']} />,
+            children: [
+              {
+                path: 'promotions',
+                element: <AdminPromotionsPage />,
               },
             ],
           },
