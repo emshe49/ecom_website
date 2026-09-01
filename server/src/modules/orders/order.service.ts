@@ -31,6 +31,7 @@ import { User } from '../users/user.model.js';
 import { Shipment } from '../shipping/shipment.model.js';
 import { SHIPMENT_STATUS } from '../shipping/shipping.constants.js';
 import { redemptionService } from '../promotions/redemption.service.js';
+import { notificationService } from '../notifications/notification.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
@@ -258,6 +259,14 @@ export const orderService = {
     }
 
     logger.info(`Order ${orderNumber} successfully created for customer ${userId}`);
+
+    // 13. Notify customer of order placement (secondary side effect)
+    notificationService
+      .notifyOrderEvent(userId, newOrder._id.toString(), orderNumber, 'PLACED')
+      .catch((err) =>
+        logger.error(`Order placed notification failed: ${err.message}`)
+      );
+
     return orderMapper.toOrderDetailDTO(newOrder);
   },
 
@@ -473,6 +482,13 @@ export const orderService = {
 
     logger.info(`Order ${updated.orderNumber} successfully cancelled by customer ${userId}`);
 
+    // Notify customer of order cancellation
+    notificationService
+      .notifyOrderEvent(userId, updated._id.toString(), updated.orderNumber, ORDER_STATUS.CANCELLED)
+      .catch((err) =>
+        logger.error(`Order cancelled notification failed: ${err.message}`)
+      );
+
     return orderMapper.toOrderDetailDTO(updated);
   },
 
@@ -646,6 +662,14 @@ export const orderService = {
     }
 
     logger.info(`Order ${updated.orderNumber} status changed from ${order.status} to ${newStatus} by admin ${adminId}`);
+
+    // Notify customer of order status update
+    notificationService
+      .notifyOrderEvent(updated.userId.toString(), updated._id.toString(), updated.orderNumber, newStatus)
+      .catch((err) =>
+        logger.error(`Order status update notification failed: ${err.message}`)
+      );
+
     return orderMapper.toAdminOrderDetailDTO(updated);
   },
 
@@ -760,6 +784,13 @@ export const orderService = {
     }
 
     logger.info(`Order ${updated.orderNumber} cancelled by admin ${adminId}. Reason: ${reason}`);
+
+    // Notify customer of admin cancellation
+    notificationService
+      .notifyOrderEvent(order.userId.toString(), updated._id.toString(), updated.orderNumber, ORDER_STATUS.CANCELLED)
+      .catch((err) =>
+        logger.error(`Admin order cancelled notification failed: ${err.message}`)
+      );
 
     return orderMapper.toAdminOrderDetailDTO(updated);
   },

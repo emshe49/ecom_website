@@ -28,6 +28,7 @@ import { shippingMapper } from './shipping.mapper.js';
 import { shipmentNumberService } from './shipment-number.service.js';
 import { shipmentStatusService } from './shipment-status.service.js';
 import { shippingProviderRegistry } from './providers/provider-registry.js';
+import { notificationService } from '../notifications/notification.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
@@ -202,6 +203,21 @@ export const shipmentService = {
     logger.info(
       `Shipment ${shipment.shipmentNumber} transitioned: ${fromStatus} -> ${toStatus}`
     );
+
+    // Notify customer of shipment status update
+    notificationService
+      .notifyShipmentEvent(
+        shipment.userId.toString(),
+        shipment.orderId.toString(),
+        shipment.orderNumber,
+        shipment._id.toString(),
+        toStatus,
+        shipment.trackingNumber || undefined,
+        shipment.carrierName || shipment.carrier || undefined
+      )
+      .catch((err) =>
+        logger.error(`Shipment notification failed: ${err.message}`)
+      );
 
     return shippingMapper.toAdminShipmentDetailDTO(shipment);
   },

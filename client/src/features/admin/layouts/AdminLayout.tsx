@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../auth/store/auth.store';
 import { usePermission } from '../../auth/hooks/usePermission';
 import { ROLE_LABELS, ROLE_COLORS } from '../types/admin.types';
+import { NotificationBell } from '../../notifications/components/NotificationBell';
 
 export const AdminLayout: React.FC = () => {
   const { user } = useAuthStore();
@@ -334,6 +335,7 @@ export const AdminLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <div
               className={`px-2.5 py-1 rounded-full text-xs font-semibold border flex items-center gap-1.5 ${roleStyle.bg} ${roleStyle.text} ${roleStyle.border}`}
             >

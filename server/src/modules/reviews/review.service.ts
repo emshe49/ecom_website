@@ -13,6 +13,7 @@ import {
 import { ReviewMapper } from './review.mapper.js';
 import { reviewEligibilityService } from './review-eligibility.service.js';
 import { reviewRatingService } from './review-rating.service.js';
+import { notificationService } from '../notifications/notification.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
@@ -323,6 +324,21 @@ export class ReviewService {
       .populate('orderId', 'orderNumber')
       .populate('variantId', 'name sku attributes')
       .populate('moderatedBy', 'firstName lastName email');
+
+    const productName = (populatedReview?.productId as any)?.name || 'Product';
+
+    // Notify review author of moderation outcome
+    notificationService
+      .notifyReviewEvent(
+        review.userId.toString(),
+        review._id.toString(),
+        productName,
+        input.status,
+        input.reason || undefined
+      )
+      .catch((err) =>
+        logger.error(`Review moderation notification failed: ${err.message}`)
+      );
 
     return ReviewMapper.toAdminDTO(populatedReview || review);
   }

@@ -41,10 +41,10 @@ import { AdminShipmentsPage } from '../features/shipping/pages/AdminShipmentsPag
 import { AdminShipmentDetailsPage } from '../features/shipping/pages/AdminShipmentDetailsPage';
 import { MyReviewsPage } from '../features/reviews/pages/MyReviewsPage';
 import { AdminReviewsPage } from '../features/reviews/pages/AdminReviewsPage';
-import { AdminReviewDetailsPage } from '../features/reviews/pages/AdminReviewDetailsPage';
 import { AdminCouponsPage } from '../features/admin/promotions/pages/AdminCouponsPage';
 import { AdminCouponDetailsPage } from '../features/admin/promotions/pages/AdminCouponDetailsPage';
 import { AdminPromotionsPage } from '../features/admin/promotions/pages/AdminPromotionsPage';
+import { NotificationsPage } from '../features/notifications/pages/NotificationsPage';
 
 export const router = createBrowserRouter([
   {
@@ -132,6 +132,14 @@ export const router = createBrowserRouter([
           {
             path: 'reviews',
             element: <MyReviewsPage />,
+          },
+          {
+            path: 'notifications',
+            element: <NotificationsPage />,
+          },
+          {
+            path: 'account/notifications',
+            element: <NotificationsPage />,
           },
         ],
       },

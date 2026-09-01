@@ -31,6 +31,7 @@ import { paymentNumberService } from './payment-number.service.js';
 import { paymentStatusService } from './payment-status.service.js';
 import { providerRegistry } from './providers/provider-registry.js';
 import { paymentMapper } from './payment.mapper.js';
+import { notificationService } from '../notifications/notification.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
@@ -327,11 +328,31 @@ export const paymentService = {
     await payment.save();
 
     // Update Order paymentStatus to PAID
-    await Order.findByIdAndUpdate(payment.orderId, {
-      $set: {
-        paymentStatus: ORDER_PAYMENT_STATUS.PAID,
+    const order = await Order.findByIdAndUpdate(
+      payment.orderId,
+      {
+        $set: {
+          paymentStatus: ORDER_PAYMENT_STATUS.PAID,
+        },
       },
-    });
+      { new: true }
+    );
+
+    if (order) {
+      notificationService
+        .notifyPaymentEvent(
+          order.userId.toString(),
+          order._id.toString(),
+          order.orderNumber,
+          payment._id.toString(),
+          'SUCCEEDED',
+          payment.amount,
+          payment.currency
+        )
+        .catch((err) =>
+          logger.error(`Payment success notification failed: ${err.message}`)
+        );
+    }
 
     logger.info(
       `Payment ${payment.paymentNumber} marked SUCCEEDED for Order ${payment.orderId}`
@@ -395,6 +416,23 @@ export const paymentService = {
     logger.info(
       `Payment attempt failed on ${payment.paymentNumber}: [${failureCode}] ${failureMessage}`
     );
+
+    if (order) {
+      notificationService
+        .notifyPaymentEvent(
+          order.userId.toString(),
+          order._id.toString(),
+          order.orderNumber,
+          payment._id.toString(),
+          'FAILED',
+          payment.amount,
+          payment.currency,
+          attemptId ? attemptId.toString() : undefined
+        )
+        .catch((err) =>
+          logger.error(`Payment failed notification failed: ${err.message}`)
+        );
+    }
   },
 
   /**

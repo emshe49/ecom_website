@@ -38,6 +38,7 @@ import {
   adminCouponRouter,
   adminPromotionRouter,
 } from '../modules/promotions/admin-promotion.routes.js';
+import notificationRouter from '../modules/notifications/notification.routes.js';
 
 const apiRouter = Router();
 
@@ -91,6 +92,9 @@ v1Router.use('/admin/reviews', adminReviewRouter);
 // Coupons & Promotions Routes (Module 16)
 v1Router.use('/admin/coupons', adminCouponRouter);
 v1Router.use('/admin/promotions', adminPromotionRouter);
+
+// Notifications Routes (Module 18)
+v1Router.use('/notifications', notificationRouter);
 
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);

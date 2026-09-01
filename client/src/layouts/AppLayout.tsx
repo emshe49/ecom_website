@@ -6,6 +6,7 @@ import { useAuthStore } from '../features/auth/store/auth.store';
 import { authApi } from '../features/auth/api/auth.api';
 import { cartApi } from '../features/cart/api/cart.api';
 import { useWishlist } from '../features/wishlist/hooks/useWishlist';
+import { NotificationBell } from '../features/notifications/components/NotificationBell';
 
 export const AppLayout: React.FC = () => {
   const { user, isAuthenticated, clearAuth } = useAuthStore();
@@ -118,6 +119,7 @@ export const AppLayout: React.FC = () => {
 
             {isAuthenticated && user ? (
               <div className="flex items-center gap-3">
+                <NotificationBell />
                 {isStaff && (
                   <Link
                     to="/admin"

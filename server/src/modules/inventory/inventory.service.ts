@@ -25,6 +25,7 @@ import { Brand } from '../catalog/brands/brand.model.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { escapeRegex } from '../catalog/catalog.utils.js';
+import { notificationService } from '../notifications/notification.service.js';
 
 export class InventoryService {
   /**
@@ -470,9 +471,28 @@ export class InventoryService {
       newReserved: updated.reserved,
       reason,
       referenceType: REFERENCE_TYPE.ORDER,
-      referenceId: orderId || null,
       createdBy: null,
     });
+
+    const prevAvail = prevOnHand - prevReserved;
+    const newAvail = updated.onHand - updated.reserved;
+    if (newAvail <= updated.lowStockThreshold && prevAvail > updated.lowStockThreshold) {
+      ProductVariant.findById(vId)
+        .then(async (variant) => {
+          if (variant) {
+            const prod = await Product.findById(variant.productId);
+            const prodName = prod?.name || 'Product';
+            return notificationService.notifyLowStockEvent(
+              prodName,
+              variant.sku,
+              vId.toString(),
+              newAvail,
+              updated.lowStockThreshold
+            );
+          }
+        })
+        .catch(() => null);
+    }
 
     return {
       success: true,
