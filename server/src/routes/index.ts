@@ -18,7 +18,7 @@ import {
 } from '../modules/catalog/products/product.routes.js';
 import { cartRouter } from '../modules/cart/cart.routes.js';
 import { wishlistRouter } from '../modules/wishlist/wishlist.routes.js';
-
+import { inventoryRouter } from '../modules/inventory/inventory.routes.js';
 
 const apiRouter = Router();
 
@@ -38,11 +38,15 @@ v1Router.use('/admin/brands', adminBrandRouter);
 v1Router.use('/products', publicProductRouter);
 v1Router.use('/admin/products', adminProductRouter);
 
+// Inventory Routes (Module 10)
+v1Router.use('/admin/inventory', inventoryRouter);
+
 // Cart Routes (Module 08)
 v1Router.use('/cart', cartRouter);
 
 // Wishlist Routes (Module 09)
 v1Router.use('/wishlist', wishlistRouter);
+
 
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);

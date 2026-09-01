@@ -338,4 +338,44 @@ The Wishlist module enables authenticated customers to bookmark products for fut
 | `DELETE` | `/api/v1/wishlist/items/:productId` | Yes (CUSTOMER) | Removes a saved product from the wishlist (resilient to deleted products) |
 | `DELETE` | `/api/v1/wishlist` | Yes (CUSTOMER) | Clears all items from the customer's wishlist |
 
+---
+
+## 9. Inventory Management Domain Architecture (Module 10)
+
+### 9.1 Domain Boundaries & Granularity
+1. **Variant-Level Granularity**:
+   - Inventory belongs strictly to `ProductVariant`, **not** `Product`. Each sellable SKU has independent stock counts.
+2. **Dedicated Collections & Computed Availability**:
+   - `Inventory` documents store physical counts:
+     - `onHand`: Total physical items recorded in inventory.
+     - `reserved`: Items temporarily committed to active checkouts/orders but not yet shipped/finalized.
+     - `lowStockThreshold`: Custom threshold (default: 5) triggering low-stock alert status.
+   - **`available` is computed dynamically on the fly** as `Math.max(0, onHand - reserved)` to prevent stale stored counters and race conditions.
+3. **Atomic Concurrency & Overselling Prevention**:
+   - All stock modifications use atomic conditional MongoDB updates (`$inc`, `$set`) with strict query guards:
+     - `STOCK_OUT`: `$expr: { $gte: [{ $subtract: ['$onHand', qty] }, '$reserved'] }`
+     - `ADJUSTMENT`: `reserved: { $lte: newOnHand }`
+     - `reserveStock`: `$expr: { $gte: [{ $subtract: ['$onHand', '$reserved'] }, quantity] }`
+     - `releaseStock`: `reserved: { $gte: quantity }`
+   - Under no circumstances can physical `onHand` drop below committed `reserved` stock.
+4. **Append-Only Immutable Audit Trail**:
+   - Every stock alteration creates an immutable `InventoryTransaction` record capturing `{ type, quantity, previousOnHand, newOnHand, previousReserved, newReserved, reason, referenceType, referenceId, createdBy }`.
+   - Historical transactions are never mutated or hard-deleted.
+5. **Catalog & Cart Integration**:
+   - **Variant Creation**: Automatically initializes default inventory (`onHand: 0, reserved: 0, lowStockThreshold: 5`).
+   - **Deletion Safeguards**: Rejects hard-deletion of any variant or product that possesses active stock (`onHand > 0 || reserved > 0`) or historical transactions (`ERR_VARIANT_HAS_INVENTORY_HISTORY`).
+   - **Cart Validation**: Adding to Cart checks real-time available stock (`ERR_CART_INSUFFICIENT_STOCK`). Cart enrichment flags out-of-stock and under-stocked items as `isAvailable: false` with `OUT_OF_STOCK` or `INSUFFICIENT_STOCK` reasons.
+   - **Storefront Stock Badges**: Public product endpoints return computed `inStock` (`boolean`) and `stockStatus` (`IN_STOCK` | `LOW_STOCK` | `OUT_OF_STOCK`) without leaking exact physical warehouse quantities.
+
+### 9.2 Inventory API Endpoint Catalog
+| Method | Endpoint | Auth & Permission | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/admin/inventory` | `inventory:read` | Lists all variant inventory with search, pagination, sort, and status filtering |
+| `GET` | `/api/v1/admin/inventory/transactions` | `inventory:read` | Global inventory audit trail across all variants |
+| `GET` | `/api/v1/admin/inventory/:variantId` | `inventory:read` | Retrieves detailed inventory status and recent transactions for a variant |
+| `POST` | `/api/v1/admin/inventory/:variantId/adjust` | `inventory:adjust` | Performs atomic STOCK_IN, STOCK_OUT, or absolute ADJUSTMENT with audit logging |
+| `PATCH` | `/api/v1/admin/inventory/:variantId/threshold` | `inventory:adjust` or `inventory:update` | Updates low-stock threshold for alert triggering |
+| `GET` | `/api/v1/admin/inventory/:variantId/transactions` | `inventory:read` | Retrieves transaction history for a specific variant |
+
+
 

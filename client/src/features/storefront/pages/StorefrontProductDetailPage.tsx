@@ -302,7 +302,7 @@ export const StorefrontProductDetailPage: React.FC = () => {
           {/* Pricing Box */}
           <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-2xl space-y-1.5">
             {matchedVariant ? (
-              <div className="flex items-baseline gap-3">
+              <div className="flex flex-wrap items-baseline gap-3">
                 <span className="text-2xl font-black text-emerald-400 font-mono">
                   {formatMoney(matchedVariant.price, product.priceRange?.currency || 'PKR')}
                 </span>
@@ -311,9 +311,24 @@ export const StorefrontProductDetailPage: React.FC = () => {
                     {formatMoney(matchedVariant.compareAtPrice, product.priceRange?.currency || 'PKR')}
                   </span>
                 )}
-                <span className="text-xs text-slate-400 font-mono ml-auto">
-                  SKU: <strong className="text-slate-200">{matchedVariant.sku}</strong>
-                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  <span className="text-xs text-slate-400 font-mono">
+                    SKU: <strong className="text-slate-200">{matchedVariant.sku}</strong>
+                  </span>
+                  {matchedVariant.inStock === false || matchedVariant.stockStatus === 'OUT_OF_STOCK' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                      Out of Stock
+                    </span>
+                  ) : matchedVariant.stockStatus === 'LOW_STOCK' ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      Low Stock
+                    </span>
+                  ) : (
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                      In Stock
+                    </span>
+                  )}
+                </div>
               </div>
             ) : product.priceRange ? (
               <div className="flex items-baseline gap-3">
@@ -414,41 +429,67 @@ export const StorefrontProductDetailPage: React.FC = () => {
                 <QuantityControl
                   quantity={quantity}
                   onChange={setQuantity}
-                  disabled={!matchedVariant || addToCartMutation.isPending}
+                  disabled={
+                    !matchedVariant ||
+                    matchedVariant.inStock === false ||
+                    matchedVariant.stockStatus === 'OUT_OF_STOCK' ||
+                    addToCartMutation.isPending
+                  }
                 />
               </div>
 
               <div className="flex-1 space-y-1 pt-4">
-                <button
-                  type="button"
-                  onClick={handleAddToCart}
-                  disabled={!matchedVariant || addToCartMutation.isPending}
-                  className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-sm shadow-lg transition-all cursor-pointer ${
-                    matchedVariant
-                      ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 hover:scale-[1.02]'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                  }`}
-                >
-                  {addToCartMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Adding to Cart...</span>
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="w-4 h-4" />
-                      <span>
-                        {!isAuthenticated
-                          ? 'Sign In to Add to Cart'
+                {(() => {
+                  const isOutOfStock =
+                    matchedVariant &&
+                    (matchedVariant.inStock === false ||
+                      matchedVariant.stockStatus === 'OUT_OF_STOCK');
+
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      disabled={
+                        !matchedVariant ||
+                        isOutOfStock ||
+                        addToCartMutation.isPending
+                      }
+                      className={`w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-semibold text-sm shadow-lg transition-all ${
+                        isOutOfStock
+                          ? 'bg-rose-950/40 border border-rose-800/60 text-rose-400 cursor-not-allowed opacity-90'
                           : matchedVariant
-                          ? 'Add to Cart'
-                          : 'Select an Option'}
-                      </span>
-                    </>
-                  )}
-                </button>
+                          ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-600/30 hover:scale-[1.02] cursor-pointer'
+                          : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                      }`}
+                    >
+                      {addToCartMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Adding to Cart...</span>
+                        </>
+                      ) : isOutOfStock ? (
+                        <>
+                          <AlertCircle className="w-4 h-4 text-rose-400" />
+                          <span>Out of Stock</span>
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart className="w-4 h-4" />
+                          <span>
+                            {!isAuthenticated
+                              ? 'Sign In to Add to Cart'
+                              : matchedVariant
+                              ? 'Add to Cart'
+                              : 'Select an Option'}
+                          </span>
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
+
 
             {/* Wishlist Action Button */}
             <WishlistButton

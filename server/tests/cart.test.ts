@@ -9,6 +9,8 @@ import { Brand } from '../src/modules/catalog/brands/brand.model.js';
 import { Product } from '../src/modules/catalog/products/product.model.js';
 import { ProductVariant } from '../src/modules/catalog/products/product-variant.model.js';
 import { Cart } from '../src/modules/cart/cart.model.js';
+import { Inventory } from '../src/modules/inventory/inventory.model.js';
+import { InventoryTransaction } from '../src/modules/inventory/inventory-transaction.model.js';
 import { ROLES } from '../src/modules/authorization/roles.js';
 import { PRODUCT_STATUS } from '../src/modules/catalog/products/product.constants.js';
 
@@ -45,10 +47,13 @@ describe('Module 08: Shopping Cart Management Test Suite', () => {
 
     // Clean test data
     await Cart.deleteMany({});
+    await InventoryTransaction.deleteMany({});
+    await Inventory.deleteMany({});
     await ProductVariant.deleteMany({});
     await Product.deleteMany({});
     await Category.deleteMany({});
     await Brand.deleteMany({});
+
     await User.deleteMany({
       email: {
         $in: [
@@ -291,16 +296,29 @@ describe('Module 08: Shopping Cart Management Test Suite', () => {
       attributeSignature: 'default',
       isActive: true,
     });
-  });
 
+    // Seed inventory stock for all test variants
+    const allVariants = await ProductVariant.find({});
+    for (const v of allVariants) {
+      await Inventory.create({
+        variantId: v._id,
+        onHand: 100,
+        reserved: 0,
+        lowStockThreshold: 5,
+      });
+    }
+  });
 
   afterAll(async () => {
     await Cart.deleteMany({});
+    await InventoryTransaction.deleteMany({});
+    await Inventory.deleteMany({});
     await ProductVariant.deleteMany({});
     await Product.deleteMany({});
     await Category.deleteMany({});
     await Brand.deleteMany({});
     await User.deleteMany({
+
       email: {
         $in: [
           'cart.customer.a@test.com',
@@ -832,10 +850,18 @@ describe('Module 08: Shopping Cart Management Test Suite', () => {
       });
       const tempVariantId = tempVariant._id.toString();
 
+      await Inventory.create({
+        variantId: tempVariant._id,
+        onHand: 10,
+        reserved: 0,
+        lowStockThreshold: 5,
+      });
+
       await request(app)
         .post('/api/v1/cart/items')
         .set('Authorization', `Bearer ${customerAToken}`)
         .send({ variantId: tempVariantId, quantity: 1 });
+
 
       // Hard delete from database
       await ProductVariant.findByIdAndDelete(tempVariantId);

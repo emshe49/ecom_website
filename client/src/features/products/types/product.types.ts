@@ -32,11 +32,14 @@ export interface ProductVariant {
   weightGrams?: number | null;
   dimensions?: VariantDimensions | null;
   isActive: boolean;
+  inStock?: boolean;
+  stockStatus?: 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
   createdBy?: string | null;
   updatedBy?: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
 
 export interface PriceRange {
   min: number;

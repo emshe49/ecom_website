@@ -9,7 +9,11 @@ import {
   UpdateVariantDTO,
   ProductAttributeDTO,
 } from './product.types.js';
+import { Inventory, IInventory } from '../../inventory/inventory.model.js';
+import { InventoryTransaction } from '../../inventory/inventory-transaction.model.js';
+import { inventoryService } from '../../inventory/inventory.service.js';
 import { AppError } from '../../../shared/errors/app-error.js';
+
 import { ErrorCodes } from '../../../shared/errors/error-codes.js';
 
 export class VariantService {
@@ -67,7 +71,17 @@ export class VariantService {
     };
   }
 
-  mapToPublicDTO(variant: IProductVariant): PublicVariantDTO {
+  mapToPublicDTO(
+    variant: IProductVariant,
+    inventory?: IInventory | null
+  ): PublicVariantDTO {
+    const onHand = inventory?.onHand ?? 0;
+    const reserved = inventory?.reserved ?? 0;
+    const available = Math.max(0, onHand - reserved);
+    const threshold = inventory?.lowStockThreshold ?? 5;
+    const inStock = available > 0;
+    const stockStatus = inventoryService.computeStockStatus(available, threshold);
+
     return {
       id: variant._id.toString(),
       productId: variant.productId.toString(),
@@ -84,6 +98,8 @@ export class VariantService {
       weightGrams: variant.weightGrams || null,
       dimensions: variant.dimensions || null,
       isActive: variant.isActive,
+      inStock,
+      stockStatus,
     };
   }
 
@@ -142,8 +158,13 @@ export class VariantService {
     });
 
     await variant.save();
+
+    // Automatically initialize Inventory record for new Variant
+    await inventoryService.getOrCreateInventory(variant._id);
+
     return this.mapToDTO(variant);
   }
+
 
   async listVariants(productId: string): Promise<ProductVariantDTO[]> {
     const productObjectId = new Types.ObjectId(productId);
@@ -297,8 +318,27 @@ export class VariantService {
       }
     }
 
+    // Inventory check: cannot hard-delete variant with positive stock or transaction history
+    const inv = await Inventory.findOne({ variantId: variantObjectId });
+    const hasTransactions = await InventoryTransaction.exists({
+      variantId: variantObjectId,
+    });
+
+    if ((inv && (inv.onHand > 0 || inv.reserved > 0)) || hasTransactions) {
+      throw AppError.badRequest(
+        'Cannot hard-delete variant with inventory stock or transaction history. Deactivate or archive the variant instead.',
+        ErrorCodes.ERR_VARIANT_HAS_INVENTORY_HISTORY
+      );
+    }
+
+    if (inv) {
+      await Inventory.deleteOne({ _id: inv._id });
+    }
+
     await ProductVariant.findByIdAndDelete(variantObjectId);
   }
 }
+
+
 
 export const variantService = new VariantService();

@@ -15,6 +15,9 @@ import {
   PublicProductQueryFilters,
   PriceRangeDTO,
 } from './product.types.js';
+import { Inventory, IInventory } from '../../inventory/inventory.model.js';
+
+import { InventoryTransaction } from '../../inventory/inventory-transaction.model.js';
 import { variantService } from './variant.service.js';
 import { slugify, escapeRegex } from '../catalog.utils.js';
 import { env } from '../../../config/env.js';
@@ -515,10 +518,32 @@ export class ProductService {
       throw AppError.notFound('Product not found.', ErrorCodes.ERR_PRODUCT_NOT_FOUND);
     }
 
-    // Delete all associated variants
+    const variants = await ProductVariant.find({ productId: productObjectId });
+    const variantIds = variants.map((v) => v._id);
+
+    const [activeStock, hasTransactions] = await Promise.all([
+      Inventory.exists({
+        variantId: { $in: variantIds },
+        $or: [{ onHand: { $gt: 0 } }, { reserved: { $gt: 0 } }],
+      }),
+      InventoryTransaction.exists({
+        variantId: { $in: variantIds },
+      }),
+    ]);
+
+    if (activeStock || hasTransactions) {
+      throw AppError.badRequest(
+        'Cannot hard-delete product with inventory stock or transaction history. Deactivate or archive the product instead.',
+        ErrorCodes.ERR_VARIANT_HAS_INVENTORY_HISTORY
+      );
+    }
+
+    // Delete associated inventory docs, variants, and product
+    await Inventory.deleteMany({ variantId: { $in: variantIds } });
     await ProductVariant.deleteMany({ productId: productObjectId });
     await Product.findByIdAndDelete(productObjectId);
   }
+
 
   // Cross-module dependency check helpers
   async existsByCategory(categoryId: string): Promise<boolean> {
@@ -720,6 +745,13 @@ export class ProductService {
       currency: env.STORE_CURRENCY,
     };
 
+    const variantIds = activeVariants.map((v) => v._id);
+    const inventories = await Inventory.find({ variantId: { $in: variantIds } });
+    const invMap = new Map<string, IInventory>();
+    for (const inv of inventories) {
+      invMap.set(inv.variantId.toString(), inv);
+    }
+
     return {
       id: product._id.toString(),
       name: product.name,
@@ -750,9 +782,12 @@ export class ProductService {
       seoTitle: product.seoTitle || null,
       seoDescription: product.seoDescription || null,
       priceRange,
-      variants: activeVariants.map((v) => variantService.mapToPublicDTO(v)),
+      variants: activeVariants.map((v) =>
+        variantService.mapToPublicDTO(v, invMap.get(v._id.toString()))
+      ),
     };
   }
 }
+
 
 export const productService = new ProductService();

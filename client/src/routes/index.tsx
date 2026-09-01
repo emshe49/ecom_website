@@ -22,8 +22,10 @@ import BrandsPage from '../features/catalog/pages/BrandsPage';
 import ProductsPage from '../features/products/pages/ProductsPage';
 import CreateProductPage from '../features/products/pages/CreateProductPage';
 import EditProductPage from '../features/products/pages/EditProductPage';
+import { InventoryPage } from '../features/inventory/pages/InventoryPage';
 import StorefrontProductsPage from '../features/storefront/pages/StorefrontProductsPage';
 import StorefrontProductDetailPage from '../features/storefront/pages/StorefrontProductDetailPage';
+
 
 export const router = createBrowserRouter([
   {
@@ -151,8 +153,18 @@ export const router = createBrowserRouter([
               },
             ],
           },
+          {
+            element: <PermissionRoute permission="inventory:read" />,
+            children: [
+              {
+                path: 'inventory',
+                element: <InventoryPage />,
+              },
+            ],
+          },
         ],
       },
     ],
   },
 ]);
+

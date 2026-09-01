@@ -50,7 +50,10 @@ export interface PublicVariantDTO {
   weightGrams?: number | null;
   dimensions?: VariantDimensionsDTO | null;
   isActive: boolean;
+  inStock?: boolean;
+  stockStatus?: string;
 }
+
 
 export interface PriceRangeDTO {
   min: number;

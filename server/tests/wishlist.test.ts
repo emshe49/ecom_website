@@ -7,7 +7,10 @@ import { Category } from '../src/modules/catalog/categories/category.model.js';
 import { Brand } from '../src/modules/catalog/brands/brand.model.js';
 import { Product } from '../src/modules/catalog/products/product.model.js';
 import { ProductVariant } from '../src/modules/catalog/products/product-variant.model.js';
+
 import { Wishlist } from '../src/modules/wishlist/wishlist.model.js';
+import { Inventory } from '../src/modules/inventory/inventory.model.js';
+import { InventoryTransaction } from '../src/modules/inventory/inventory-transaction.model.js';
 import { ROLES } from '../src/modules/authorization/roles.js';
 import { PRODUCT_STATUS } from '../src/modules/catalog/products/product.constants.js';
 import { UNAVAILABLE_REASON } from '../src/modules/wishlist/wishlist.constants.js';
@@ -48,10 +51,13 @@ describe('Module 09: Customer Wishlist Management Test Suite', () => {
 
     // Clean test state
     await Wishlist.deleteMany({});
+    await InventoryTransaction.deleteMany({});
+    await Inventory.deleteMany({});
     await ProductVariant.deleteMany({});
     await Product.deleteMany({});
     await Category.deleteMany({});
     await Brand.deleteMany({});
+
     await User.deleteMany({
       email: {
         $in: [
@@ -335,15 +341,29 @@ describe('Module 09: Customer Wishlist Management Test Suite', () => {
       status: PRODUCT_STATUS.ACTIVE,
     });
     prodNoVariantsId = prodNoVar._id.toString();
+
+    // Seed inventory stock for all test variants
+    const allVariants = await ProductVariant.find({});
+    for (const v of allVariants) {
+      await Inventory.create({
+        variantId: v._id,
+        onHand: 100,
+        reserved: 0,
+        lowStockThreshold: 5,
+      });
+    }
   });
 
   afterAll(async () => {
     await Wishlist.deleteMany({});
+    await InventoryTransaction.deleteMany({});
+    await Inventory.deleteMany({});
     await ProductVariant.deleteMany({});
     await Product.deleteMany({});
     await Category.deleteMany({});
     await Brand.deleteMany({});
     await User.deleteMany({
+
       email: {
         $in: [
           'wishlist.cust.a@test.com',

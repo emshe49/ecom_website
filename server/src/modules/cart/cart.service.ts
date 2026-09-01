@@ -5,6 +5,8 @@ import { Product, IProduct, IProductImage } from '../catalog/products/product.mo
 import { ICategory } from '../catalog/categories/category.model.js';
 import { IBrand } from '../catalog/brands/brand.model.js';
 import { PRODUCT_STATUS } from '../catalog/products/product.constants.js';
+import { Inventory, IInventory } from '../inventory/inventory.model.js';
+import { inventoryService } from '../inventory/inventory.service.js';
 import {
   MAX_CART_ITEM_QUANTITY,
   MAX_CART_DISTINCT_ITEMS,
@@ -43,14 +45,19 @@ export class CartService {
 
     // Sort items by addedAt descending (newest first)
     const sortedItems = [...cart.items].sort(
-      (a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
+      (a, b) => b.addedAt.getTime() - a.addedAt.getTime()
     );
 
     const variantIds = sortedItems.map((item) => item.variantId);
 
-    // 1. Batch fetch all variants
-    const variants = await ProductVariant.find({ _id: { $in: variantIds } });
+    // 1. Batch fetch all variants and inventories
+    const [variants, inventoryDocs] = await Promise.all([
+      ProductVariant.find({ _id: { $in: variantIds } }),
+      Inventory.find({ variantId: { $in: variantIds } }),
+    ]);
+
     const variantMap = new Map<string, IProductVariant>();
+    const invMap = new Map<string, IInventory>();
     const productIds: Types.ObjectId[] = [];
 
     for (const v of variants) {
@@ -58,6 +65,10 @@ export class CartService {
       if (v.productId) {
         productIds.push(v.productId);
       }
+    }
+
+    for (const inv of inventoryDocs) {
+      invMap.set(inv.variantId.toString(), inv);
     }
 
     // 2. Batch fetch parent products with category and brand populated
@@ -147,6 +158,22 @@ export class CartService {
             isAvailable = false;
             unavailableReason = UNAVAILABLE_REASON.BRAND_INACTIVE;
           }
+        }
+      }
+
+      // Check stock availability
+      const inv = invMap.get(vidStr);
+      const onHand = inv?.onHand ?? 0;
+      const reserved = inv?.reserved ?? 0;
+      const available = Math.max(0, onHand - reserved);
+
+      if (isAvailable) {
+        if (available === 0) {
+          isAvailable = false;
+          unavailableReason = UNAVAILABLE_REASON.OUT_OF_STOCK;
+        } else if (item.quantity > available) {
+          isAvailable = false;
+          unavailableReason = UNAVAILABLE_REASON.INSUFFICIENT_STOCK;
         }
       }
 
@@ -266,6 +293,54 @@ export class CartService {
 
     // 6. Find or create Cart
     let cart = await Cart.findOne({ userId: userObjectId });
+    const existingIndex = cart
+      ? cart.items.findIndex((item) => item.variantId.equals(variantObjectId))
+      : -1;
+
+    if (
+      cart &&
+      existingIndex === -1 &&
+      cart.items.length >= MAX_CART_DISTINCT_ITEMS
+    ) {
+      throw AppError.badRequest(
+        `Cart item limit reached. You can have at most ${MAX_CART_DISTINCT_ITEMS} distinct items in your cart.`,
+        ErrorCodes.ERR_CART_ITEM_LIMIT_REACHED
+      );
+    }
+
+    if (cart && existingIndex > -1) {
+      const nextQuantity =
+        cart.items[existingIndex].quantity + dto.quantity;
+      if (nextQuantity > MAX_CART_ITEM_QUANTITY) {
+        throw AppError.badRequest(
+          `Cannot add ${dto.quantity} item(s). Total item quantity cannot exceed ${MAX_CART_ITEM_QUANTITY}.`,
+          ErrorCodes.ERR_CART_QUANTITY_LIMIT
+        );
+      }
+    }
+
+    // 7. Check inventory stock availability
+    const inv = await inventoryService.getOrCreateInventory(variantObjectId);
+    const available = Math.max(0, inv.onHand - inv.reserved);
+
+    const targetQuantity =
+      existingIndex > -1 && cart
+        ? cart.items[existingIndex].quantity + dto.quantity
+        : dto.quantity;
+
+    if (available === 0) {
+      throw AppError.badRequest(
+        'This product variant is currently out of stock.',
+        ErrorCodes.ERR_CART_INSUFFICIENT_STOCK
+      );
+    }
+
+    if (available < targetQuantity) {
+      throw AppError.badRequest(
+        `Insufficient stock. Only ${available} item(s) available in stock.`,
+        ErrorCodes.ERR_CART_INSUFFICIENT_STOCK
+      );
+    }
 
     if (!cart) {
       cart = new Cart({
@@ -280,28 +355,9 @@ export class CartService {
       });
       await cart.save();
     } else {
-      const existingIndex = cart.items.findIndex((item) =>
-        item.variantId.equals(variantObjectId)
-      );
-
       if (existingIndex > -1) {
-        const nextQuantity =
-          cart.items[existingIndex].quantity + dto.quantity;
-        if (nextQuantity > MAX_CART_ITEM_QUANTITY) {
-          throw AppError.badRequest(
-            `Cannot add ${dto.quantity} item(s). Total item quantity cannot exceed ${MAX_CART_ITEM_QUANTITY}.`,
-            ErrorCodes.ERR_CART_QUANTITY_LIMIT
-          );
-        }
-        cart.items[existingIndex].quantity = nextQuantity;
+        cart.items[existingIndex].quantity += dto.quantity;
       } else {
-        if (cart.items.length >= MAX_CART_DISTINCT_ITEMS) {
-          throw AppError.badRequest(
-            `Cart item limit reached. You can have at most ${MAX_CART_DISTINCT_ITEMS} distinct items in your cart.`,
-            ErrorCodes.ERR_CART_ITEM_LIMIT_REACHED
-          );
-        }
-
         cart.items.push({
           variantId: variantObjectId,
           quantity: dto.quantity,
@@ -311,6 +367,7 @@ export class CartService {
 
       await cart.save();
     }
+
 
     return this.enrichCart(cart);
   }
@@ -342,11 +399,30 @@ export class CartService {
       );
     }
 
+    // Check inventory stock availability
+    const inv = await inventoryService.getOrCreateInventory(variantObjectId);
+    const available = Math.max(0, inv.onHand - inv.reserved);
+
+    if (available === 0) {
+      throw AppError.badRequest(
+        'This product variant is currently out of stock.',
+        ErrorCodes.ERR_CART_INSUFFICIENT_STOCK
+      );
+    }
+
+    if (available < quantity) {
+      throw AppError.badRequest(
+        `Insufficient stock. Only ${available} item(s) available in stock.`,
+        ErrorCodes.ERR_CART_INSUFFICIENT_STOCK
+      );
+    }
+
     item.quantity = quantity;
     await cart.save();
 
     return this.enrichCart(cart);
   }
+
 
   /**
    * Removes a variant line from the authenticated user's cart.
