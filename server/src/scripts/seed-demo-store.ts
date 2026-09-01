@@ -581,8 +581,9 @@ export async function seedDemoStore(): Promise<void> {
           price: vData.price,
           compareAtPrice: vData.compareAtPrice,
           costPrice: vData.costPrice,
-          imageUrl: vData.imageUrl || pData.product.images[0]?.url,
+          imageUrl: ('imageUrl' in vData ? (vData as { imageUrl?: string }).imageUrl : undefined) || pData.product.images[0]?.url,
           dimensions: { lengthCm: 15, widthCm: 8, heightCm: 1 },
+
           weightGrams: 200,
           isActive: true,
           createdBy: adminId,

@@ -31,7 +31,9 @@ const envSchema = z.object({
 
   // Store Configuration
   STORE_CURRENCY: z.string().default('PKR'),
+  CHECKOUT_SESSION_TTL_MINUTES: z.coerce.number().positive().default(15),
 });
+
 
 const parseEnv = () => {
   const result = envSchema.safeParse(process.env);

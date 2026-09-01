@@ -22,6 +22,11 @@ export type TransactionType =
 export const REFERENCE_TYPE = {
   MANUAL: 'MANUAL',
   ORDER: 'ORDER',
+  CHECKOUT: 'CHECKOUT',
+  PURCHASE_ORDER: 'PURCHASE_ORDER',
+  RETURN: 'RETURN',
+  SYSTEM_SYNC: 'SYSTEM_SYNC',
 } as const;
 
 export type ReferenceType = (typeof REFERENCE_TYPE)[keyof typeof REFERENCE_TYPE];
+

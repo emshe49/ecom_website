@@ -1,0 +1,11 @@
+export const CHECKOUT_STATUS = {
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  CANCELLED: 'CANCELLED',
+  INVALIDATED: 'INVALIDATED',
+  COMPLETED: 'COMPLETED',
+} as const;
+
+export type CheckoutStatus = (typeof CHECKOUT_STATUS)[keyof typeof CHECKOUT_STATUS];
+
+export const DEFAULT_CHECKOUT_TTL_MINUTES = 15;

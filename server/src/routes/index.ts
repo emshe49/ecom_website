@@ -19,6 +19,7 @@ import {
 import { cartRouter } from '../modules/cart/cart.routes.js';
 import { wishlistRouter } from '../modules/wishlist/wishlist.routes.js';
 import { inventoryRouter } from '../modules/inventory/inventory.routes.js';
+import { checkoutRouter } from '../modules/checkout/checkout.routes.js';
 
 const apiRouter = Router();
 
@@ -47,9 +48,12 @@ v1Router.use('/cart', cartRouter);
 // Wishlist Routes (Module 09)
 v1Router.use('/wishlist', wishlistRouter);
 
+// Checkout Routes (Module 11)
+v1Router.use('/checkout', checkoutRouter);
 
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);
+
 
 
 export default apiRouter;

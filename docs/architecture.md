@@ -369,13 +369,46 @@ The Wishlist module enables authenticated customers to bookmark products for fut
 
 ### 9.2 Inventory API Endpoint Catalog
 | Method | Endpoint | Auth & Permission | Description |
-| :--- | :--- | :---: | :--- |
+| :--- | :--- | :--- | :--- |
 | `GET` | `/api/v1/admin/inventory` | `inventory:read` | Lists all variant inventory with search, pagination, sort, and status filtering |
 | `GET` | `/api/v1/admin/inventory/transactions` | `inventory:read` | Global inventory audit trail across all variants |
 | `GET` | `/api/v1/admin/inventory/:variantId` | `inventory:read` | Retrieves detailed inventory status and recent transactions for a variant |
 | `POST` | `/api/v1/admin/inventory/:variantId/adjust` | `inventory:adjust` | Performs atomic STOCK_IN, STOCK_OUT, or absolute ADJUSTMENT with audit logging |
 | `PATCH` | `/api/v1/admin/inventory/:variantId/threshold` | `inventory:adjust` or `inventory:update` | Updates low-stock threshold for alert triggering |
 | `GET` | `/api/v1/admin/inventory/:variantId/transactions` | `inventory:read` | Retrieves transaction history for a specific variant |
+
+---
+
+## 10. Checkout Domain Architecture (Module 11)
+
+### 10.1 Key Principle: Purchase Intent & Inventory Reservation
+1. **Critical Distinction**:
+   - **Cart does NOT reserve Inventory**: Cart items remain fluid; availability is only informational.
+   - **Checkout DOES reserve Inventory**: When a Checkout Session is initiated, required quantities are temporarily committed (`reserved += quantity`), holding the stock for 15 minutes. Physical `onHand` is not decreased until final order fulfillment.
+2. **Checkout Lifecycle & State Machine**:
+   - `ACTIVE`: Session is valid, live, and actively holding inventory reservations.
+   - `EXPIRED`: 15-minute TTL elapsed; reserved stock has been atomically released back to general inventory.
+   - `CANCELLED`: Customer explicitly cancelled the session; reserved stock is released.
+   - `INVALIDATED`: Catalog changes (e.g. product/variant deactivated) during the active hold invalidate the session; stock is released.
+   - `COMPLETED`: Transitioned when an Order is placed (Module 12).
+3. **Atomic Multi-Item Reservation & Compensating Rollback**:
+   - Checkout loops through cart items and attempts `reserveStock()` for each variant.
+   - If any variant has insufficient stock, all previously reserved variants in the loop are immediately released via compensating rollbacks (`releaseStock()`), preventing partial stock locks and overselling.
+4. **Authoritative Live Price & Address Snapshots**:
+   - Cart prices are never trusted. Live `ProductVariant.price` values are re-queried and used for line totals and subtotal calculations.
+   - Shipping and billing addresses are snapshotted into the `CheckoutSession` document to guarantee immutability if the customer later modifies their saved profile addresses.
+5. **Revalidation & Concurrency Safety**:
+   - `POST /api/v1/checkout/revalidate` verifies active catalog status and detects price changes. If prices change, the snapshot subtotal updates with `hasPriceChanges: true`.
+   - Single active session per customer: starting a new checkout automatically cancels and releases any previous active session.
+
+### 10.2 Checkout API Endpoint Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/v1/checkout` | Yes (CUSTOMER) | Initiates a checkout session, snapshots addresses/prices, and reserves inventory |
+| `GET` | `/api/v1/checkout` | Yes (CUSTOMER) | Retrieves the current active checkout session with live remaining countdown |
+| `POST` | `/api/v1/checkout/revalidate` | Yes (CUSTOMER) | Revalidates active session before order creation; updates price changes |
+| `DELETE` | `/api/v1/checkout` | Yes (CUSTOMER) | Cancels the active checkout session and safely releases reserved stock |
+
 
 
 

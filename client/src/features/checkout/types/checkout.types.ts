@@ -1,0 +1,55 @@
+export type CheckoutStatus =
+  | 'ACTIVE'
+  | 'EXPIRED'
+  | 'CANCELLED'
+  | 'INVALIDATED'
+  | 'COMPLETED';
+
+export interface CheckoutAddressSnapshot {
+  sourceAddressId: string;
+  fullName: string;
+  phone: string;
+  country: string;
+  stateProvince: string;
+  city: string;
+  area?: string | null;
+  postalCode?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+}
+
+export interface CheckoutItemSnapshot {
+  productId: string;
+  variantId: string;
+  productName: string;
+  productSlug: string;
+  sku: string;
+  variantAttributes: Array<{ name: string; value: string }>;
+  primaryImage?: string | null;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface CheckoutSession {
+  id: string;
+  userId: string;
+  status: CheckoutStatus;
+  items: CheckoutItemSnapshot[];
+  shippingAddress: CheckoutAddressSnapshot;
+  billingAddress: CheckoutAddressSnapshot;
+  subtotal: number;
+  currency: string;
+  expiresAt: string;
+  remainingSeconds: number;
+  lastValidatedAt: string;
+  hasPriceChanges?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCheckoutInput {
+  shippingAddressId: string;
+  billingSameAsShipping: boolean;
+  billingAddressId?: string;
+}

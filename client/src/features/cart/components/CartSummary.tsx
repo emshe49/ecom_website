@@ -1,5 +1,5 @@
-import React from 'react';
 import { ShieldCheck, ArrowRight, ShoppingBag } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Cart } from '../types/cart.types';
 import { formatMoney } from '../../../utils/money';
 
@@ -14,6 +14,9 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
   onClearCart,
   isClearing = false,
 }) => {
+  const hasUnavailableItems = cart.items.some((item) => !item.isAvailable);
+  const canCheckout = cart.items.length > 0 && !hasUnavailableItems;
+
   return (
     <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl sticky top-24 backdrop-blur-md">
 
@@ -66,17 +69,27 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
 
       {/* Checkout Action Button */}
       <div className="space-y-2">
-        <button
-          type="button"
-          disabled={true}
-          className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold border border-slate-700/60 cursor-not-allowed opacity-80"
-          title="Checkout is coming in future modules"
-        >
-          <span>Proceed to Checkout</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
+        {canCheckout ? (
+          <Link
+            to="/checkout"
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+          >
+            <span>Proceed to Checkout</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={true}
+            className="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold border border-slate-700/60 cursor-not-allowed opacity-80"
+            title={hasUnavailableItems ? 'Remove unavailable items to proceed' : 'Add items to cart to proceed'}
+          >
+            <span>Proceed to Checkout</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
         <p className="text-center text-[11px] text-indigo-400/80 font-medium">
-          Checkout & payment flow will be unlocked in subsequent modules
+          Authoritative pricing and inventory reserved at checkout
         </p>
       </div>
 
@@ -88,5 +101,6 @@ export const CartSummary: React.FC<CartSummaryProps> = ({
     </div>
   );
 };
+
 
 export default CartSummary;

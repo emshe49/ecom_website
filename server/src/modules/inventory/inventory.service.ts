@@ -8,6 +8,7 @@ import {
   StockStatus,
   TRANSACTION_TYPE,
   REFERENCE_TYPE,
+  ReferenceType,
 } from './inventory.constants.js';
 import {
   InventoryItemDTO,
@@ -276,7 +277,9 @@ export class InventoryService {
   async reserveStock(
     variantId: Types.ObjectId | string,
     quantity: number,
-    referenceId?: string
+    referenceId?: string,
+    referenceType: ReferenceType = REFERENCE_TYPE.CHECKOUT,
+    reason: string = 'Checkout session inventory reservation'
   ): Promise<{
     success: boolean;
     onHand: number;
@@ -322,8 +325,8 @@ export class InventoryService {
       newOnHand: updated.onHand,
       previousReserved: prevReserved,
       newReserved: updated.reserved,
-      reason: 'Order checkout reservation',
-      referenceType: REFERENCE_TYPE.ORDER,
+      reason,
+      referenceType,
       referenceId: referenceId || null,
       createdBy: null,
     });
@@ -342,7 +345,9 @@ export class InventoryService {
   async releaseStock(
     variantId: Types.ObjectId | string,
     quantity: number,
-    referenceId?: string
+    referenceId?: string,
+    referenceType: ReferenceType = REFERENCE_TYPE.CHECKOUT,
+    reason: string = 'Checkout cancellation / expiry stock release'
   ): Promise<{
     success: boolean;
     onHand: number;
@@ -388,8 +393,8 @@ export class InventoryService {
       newOnHand: updated.onHand,
       previousReserved: prevReserved,
       newReserved: updated.reserved,
-      reason: 'Order checkout cancellation / release',
-      referenceType: REFERENCE_TYPE.ORDER,
+      reason,
+      referenceType,
       referenceId: referenceId || null,
       createdBy: null,
     });
@@ -401,6 +406,7 @@ export class InventoryService {
       available: Math.max(0, updated.onHand - updated.reserved),
     };
   }
+
 
   /**
    * Admin: List inventory across variants with comprehensive filters, search, and pagination.

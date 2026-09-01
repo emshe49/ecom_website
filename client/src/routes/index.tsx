@@ -10,6 +10,7 @@ import ResetPasswordPage from '../features/auth/pages/ResetPasswordPage';
 import ProfilePage from '../features/auth/pages/ProfilePage';
 import CartPage from '../features/cart/pages/CartPage';
 import WishlistPage from '../features/wishlist/pages/WishlistPage';
+import CheckoutPage from '../features/checkout/pages/CheckoutPage';
 
 import GuestRoute from '../features/auth/components/GuestRoute';
 import ProtectedRoute from '../features/auth/components/ProtectedRoute';
@@ -86,8 +87,13 @@ export const router = createBrowserRouter([
             path: 'wishlist',
             element: <WishlistPage />,
           },
+          {
+            path: 'checkout',
+            element: <CheckoutPage />,
+          },
         ],
       },
+
 
       // 404 Not Found
       {
