@@ -92,6 +92,15 @@ export interface ProductDTO {
   seoDescription?: string | null;
   variantsCount?: number;
   priceRange?: PriceRangeDTO | null;
+  ratingAverage: number;
+  ratingCount: number;
+  ratingDistribution?: {
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+    5: number;
+  };
   createdBy?: string | null;
   updatedBy?: string | null;
   publishedAt?: string | null;
@@ -115,12 +124,21 @@ export interface PublicProductDTO {
   images: ProductImageDTO[];
   attributes: ProductAttributeDTO[];
   priceRange: PriceRangeDTO;
+  ratingAverage: number;
+  ratingCount: number;
 }
 
 export interface PublicProductDetailDTO extends PublicProductDTO {
   description?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
+  ratingDistribution: {
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+    5: number;
+  };
   variants: PublicVariantDTO[];
 }
 

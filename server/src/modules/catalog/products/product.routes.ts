@@ -21,6 +21,8 @@ import {
   productFacetsQuerySchema,
 } from './search/product-search.validation.js';
 
+import { reviewController } from '../../reviews/review.controller.js';
+
 // Public Products Router
 const publicRouter = Router();
 
@@ -34,6 +36,11 @@ publicRouter.get(
   '/facets',
   validateRequest({ query: productFacetsQuerySchema }),
   (req, res, next) => productSearchController.getFacets(req, res, next)
+);
+
+publicRouter.get(
+  '/:productId/reviews',
+  (req, res, next) => reviewController.getPublicProductReviews(req, res, next)
 );
 
 publicRouter.get(

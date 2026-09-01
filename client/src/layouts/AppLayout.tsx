@@ -98,14 +98,22 @@ export const AppLayout: React.FC = () => {
               </>
             )}
 
-            {/* My Orders Link (Customer only) */}
+            {/* My Orders & My Reviews Links (Customer only) */}
             {isCustomer && (
-              <Link
-                to="/orders"
-                className="text-xs font-semibold text-slate-300 hover:text-indigo-400 transition-colors hidden sm:flex items-center gap-1"
-              >
-                <span>My Orders</span>
-              </Link>
+              <>
+                <Link
+                  to="/orders"
+                  className="text-xs font-semibold text-slate-300 hover:text-indigo-400 transition-colors hidden sm:flex items-center gap-1"
+                >
+                  <span>My Orders</span>
+                </Link>
+                <Link
+                  to="/account/reviews"
+                  className="text-xs font-semibold text-slate-300 hover:text-amber-400 transition-colors hidden sm:flex items-center gap-1"
+                >
+                  <span>My Reviews</span>
+                </Link>
+              </>
             )}
 
             {isAuthenticated && user ? (

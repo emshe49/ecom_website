@@ -10,6 +10,8 @@ import { useAuthStore } from '../../auth/store/auth.store';
 import { cartApi } from '../../cart/api/cart.api';
 import { QuantityControl } from '../../cart/components/QuantityControl';
 import { WishlistButton } from '../../wishlist/components/WishlistButton';
+import { RatingStars } from '../../reviews/components/RatingStars';
+import { ProductReviewsSection } from '../../reviews/components/ProductReviewsSection';
 
 interface ApiErrorData {
   error?: {
@@ -292,6 +294,21 @@ export const StorefrontProductDetailPage: React.FC = () => {
               {product.name}
             </h1>
 
+            {/* Rating Stars & Count Link */}
+            <div className="flex items-center gap-2 pt-0.5">
+              <RatingStars rating={product.ratingAverage || 0} size="sm" />
+              <a
+                href="#customer-reviews"
+                className="text-xs font-semibold text-amber-400 hover:text-amber-300 hover:underline"
+              >
+                {product.ratingCount && product.ratingCount > 0
+                  ? `${product.ratingAverage?.toFixed(1)} (${product.ratingCount} ${
+                      product.ratingCount === 1 ? 'review' : 'reviews'
+                    })`
+                  : 'No reviews yet'}
+              </a>
+            </div>
+
             {product.shortDescription && (
               <p className="text-sm text-slate-300 leading-relaxed">
                 {product.shortDescription}
@@ -553,6 +570,13 @@ export const StorefrontProductDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Customer Reviews & Rating Distribution Section */}
+      <ProductReviewsSection
+        productId={product.id}
+        productName={product.name}
+        primaryImage={product.images?.[0]?.url}
+      />
     </div>
   );
 };

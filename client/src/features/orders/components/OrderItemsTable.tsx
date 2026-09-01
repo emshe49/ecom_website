@@ -1,16 +1,19 @@
 import React from 'react';
 import { OrderItemSnapshot } from '../orders.types';
-import { ShoppingBag } from 'lucide-react';
-
+import { ShoppingBag, Star } from 'lucide-react';
 
 interface OrderItemsTableProps {
   items: OrderItemSnapshot[];
   currency?: string;
+  isDelivered?: boolean;
+  onReviewProduct?: (item: OrderItemSnapshot) => void;
 }
 
 export const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
   items,
   currency = 'PKR',
+  isDelivered = false,
+  onReviewProduct,
 }) => {
   const formatPrice = (minorUnits: number) => {
     return new Intl.NumberFormat('en-PK', {
@@ -25,7 +28,6 @@ export const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
       <div className="p-4 sm:p-6 border-b border-slate-800 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           <ShoppingBag className="w-5 h-5 text-indigo-400" />
-
           <h3 className="text-base font-semibold text-slate-100">
             Order Items ({items.reduce((sum, item) => sum + item.quantity, 0)})
           </h3>
@@ -51,6 +53,11 @@ export const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
               <th scope="col" className="py-3.5 px-4 sm:px-6 text-right">
                 Line Total
               </th>
+              {isDelivered && onReviewProduct && (
+                <th scope="col" className="py-3.5 px-4 text-center">
+                  Review
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60">
@@ -68,7 +75,6 @@ export const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
                       ) : (
                         <ShoppingBag className="w-6 h-6 text-slate-600" />
                       )}
-
                     </div>
                     <div>
                       <p className="font-medium text-slate-100 line-clamp-1">
@@ -96,6 +102,18 @@ export const OrderItemsTable: React.FC<OrderItemsTableProps> = ({
                 <td className="py-4 px-4 sm:px-6 text-right font-semibold text-slate-100">
                   {formatPrice(item.lineTotal)}
                 </td>
+                {isDelivered && onReviewProduct && (
+                  <td className="py-4 px-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => onReviewProduct(item)}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 hover:text-amber-300 rounded-lg text-xs font-bold transition-all"
+                    >
+                      <Star className="w-3.5 h-3.5 fill-amber-400" />
+                      <span>Review</span>
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

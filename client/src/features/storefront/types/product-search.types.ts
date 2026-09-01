@@ -43,6 +43,8 @@ export interface ProductCardDTO {
   tags: string[];
   images: ProductImage[];
   priceRange: PriceRange;
+  ratingAverage?: number;
+  ratingCount?: number;
   availableVariantCount: number;
 }
 

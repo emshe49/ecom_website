@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { ordersApi } from '../api/orders.api';
-import { OrderDetailDTO } from '../orders.types';
+import { OrderDetailDTO, OrderItemSnapshot } from '../orders.types';
 import { OrderStatusBadge } from '../components/OrderStatusBadge';
 import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
 import { OrderTimeline } from '../components/OrderTimeline';
 import { OrderItemsTable } from '../components/OrderItemsTable';
 import { CancelOrderModal } from '../components/CancelOrderModal';
 import { ShipmentTrackingCard } from '../../shipping/components/ShipmentTrackingCard';
+import { ReviewModal } from '../../reviews/components/ReviewModal';
 import { shippingApi } from '../../shipping/api/shipping.api';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -26,6 +27,7 @@ export const OrderDetailsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
+  const [reviewingItem, setReviewingItem] = useState<OrderItemSnapshot | null>(null);
 
   const { data: shipment } = useQuery({
     queryKey: ['order-shipment', orderId],
@@ -215,7 +217,12 @@ export const OrderDetailsPage: React.FC = () => {
       />
 
       {/* Items Table Snapshot */}
-      <OrderItemsTable items={order.items} currency={order.currency} />
+      <OrderItemsTable
+        items={order.items}
+        currency={order.currency}
+        isDelivered={order.status === 'DELIVERED'}
+        onReviewProduct={(item) => setReviewingItem(item)}
+      />
 
       {/* Addresses & Financial Summary Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -317,6 +324,25 @@ export const OrderDetailsPage: React.FC = () => {
         onClose={() => setIsCancelModalOpen(false)}
         onConfirm={handleCancelConfirm}
         isLoading={isCancelling}
+      />
+
+      {/* Review Modal */}
+      <ReviewModal
+        isOpen={!!reviewingItem}
+        onClose={() => setReviewingItem(null)}
+        product={
+          reviewingItem
+            ? {
+                productId: reviewingItem.productId,
+                productName: reviewingItem.productName,
+                primaryImage: reviewingItem.primaryImage,
+              }
+            : undefined
+        }
+        onSuccess={() => {
+          setReviewingItem(null);
+          alert('Thank you! Your verified review has been submitted.');
+        }}
       />
     </div>
   );

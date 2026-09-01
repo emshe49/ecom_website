@@ -78,6 +78,9 @@ export interface Product {
   seoDescription?: string | null;
   variantsCount?: number;
   priceRange?: PriceRange | null;
+  ratingAverage?: number;
+  ratingCount?: number;
+  ratingDistribution?: Record<number, number>;
   createdBy?: string | null;
   updatedBy?: string | null;
   publishedAt?: string | null;

@@ -1,5 +1,5 @@
 import { Types, FilterQuery } from 'mongoose';
-import { Product, IProduct, IProductImage, IProductAttribute } from './product.model.js';
+import { Product, IProduct, IProductImage, IProductAttribute, IRatingDistribution } from './product.model.js';
 import { ProductVariant } from './product-variant.model.js';
 import { Category, ICategory } from '../categories/category.model.js';
 import { Brand, IBrand } from '../brands/brand.model.js';
@@ -150,6 +150,9 @@ export class ProductService {
       tags: string[];
       images: IProductImage[];
       attributes: IProductAttribute[];
+      ratingAverage?: number;
+      ratingCount?: number;
+      ratingDistribution?: IRatingDistribution;
       seoTitle?: string | null;
       seoDescription?: string | null;
       createdBy?: Types.ObjectId | null;
@@ -212,6 +215,9 @@ export class ProductService {
       seoDescription: product.seoDescription,
       variantsCount,
       priceRange: priceRange || null,
+      ratingAverage: product.ratingAverage || 0,
+      ratingCount: product.ratingCount || 0,
+      ratingDistribution: product.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
       createdBy: product.createdBy ? product.createdBy.toString() : null,
       updatedBy: product.updatedBy ? product.updatedBy.toString() : null,
       publishedAt: product.publishedAt ? product.publishedAt.toISOString() : null,
@@ -693,6 +699,8 @@ export class ProductService {
           max: pRange.max,
           currency: env.STORE_CURRENCY,
         },
+        ratingAverage: p.ratingAverage || 0,
+        ratingCount: p.ratingCount || 0,
       };
     });
 
@@ -782,6 +790,9 @@ export class ProductService {
       seoTitle: product.seoTitle || null,
       seoDescription: product.seoDescription || null,
       priceRange,
+      ratingAverage: product.ratingAverage || 0,
+      ratingCount: product.ratingCount || 0,
+      ratingDistribution: product.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
       variants: activeVariants.map((v) =>
         variantService.mapToPublicDTO(v, invMap.get(v._id.toString()))
       ),

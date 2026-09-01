@@ -70,6 +70,8 @@ export interface PublicProductCardDTO {
   images: ProductImageDTO[];
   priceRange: PriceRangeDTO;
   availableVariantCount: number;
+  ratingAverage: number;
+  ratingCount: number;
 }
 
 export interface PaginationResponseMeta {

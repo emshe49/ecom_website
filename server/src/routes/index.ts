@@ -31,6 +31,8 @@ import {
   adminShippingMethodRouter,
   adminShipmentRouter,
 } from '../modules/shipping/admin-shipping.routes.js';
+import { reviewRouter } from '../modules/reviews/review.routes.js';
+import { adminReviewRouter } from '../modules/reviews/admin-review.routes.js';
 
 const apiRouter = Router();
 
@@ -75,6 +77,10 @@ v1Router.use('/webhooks', paymentWebhookRoutes);
 v1Router.use('/shipping', shippingRouter);
 v1Router.use('/admin/shipping-methods', adminShippingMethodRouter);
 v1Router.use('/admin/shipments', adminShipmentRouter);
+
+// Reviews & Ratings Routes (Module 15)
+v1Router.use('/reviews', reviewRouter);
+v1Router.use('/admin/reviews', adminReviewRouter);
 
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);

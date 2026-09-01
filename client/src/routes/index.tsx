@@ -39,6 +39,9 @@ import { AdminPaymentDetailsPage } from '../features/payments/pages/AdminPayment
 import { AdminShippingMethodsPage } from '../features/shipping/pages/AdminShippingMethodsPage';
 import { AdminShipmentsPage } from '../features/shipping/pages/AdminShipmentsPage';
 import { AdminShipmentDetailsPage } from '../features/shipping/pages/AdminShipmentDetailsPage';
+import { MyReviewsPage } from '../features/reviews/pages/MyReviewsPage';
+import { AdminReviewsPage } from '../features/reviews/pages/AdminReviewsPage';
+import { AdminReviewDetailsPage } from '../features/reviews/pages/AdminReviewDetailsPage';
 
 export const router = createBrowserRouter([
   {
@@ -119,6 +122,14 @@ export const router = createBrowserRouter([
             path: 'payment/result',
             element: <PaymentResultPage />,
           },
+          {
+            path: 'account/reviews',
+            element: <MyReviewsPage />,
+          },
+          {
+            path: 'reviews',
+            element: <MyReviewsPage />,
+          },
         ],
       },
 
@@ -187,6 +198,19 @@ export const router = createBrowserRouter([
               {
                 path: 'shipping-methods',
                 element: <AdminShippingMethodsPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute anyPermissions={['review:read', 'review:moderate']} />,
+            children: [
+              {
+                path: 'reviews',
+                element: <AdminReviewsPage />,
+              },
+              {
+                path: 'reviews/:reviewId',
+                element: <AdminReviewDetailsPage />,
               },
             ],
           },

@@ -13,6 +13,14 @@ export interface IProductAttribute {
   value: string;
 }
 
+export interface IRatingDistribution {
+  1: number;
+  2: number;
+  3: number;
+  4: number;
+  5: number;
+}
+
 export interface IProduct extends Document {
   _id: Types.ObjectId;
   name: string;
@@ -26,6 +34,9 @@ export interface IProduct extends Document {
   tags: string[];
   images: IProductImage[];
   attributes: IProductAttribute[];
+  ratingAverage: number;
+  ratingCount: number;
+  ratingDistribution: IRatingDistribution;
   seoTitle?: string | null;
   seoDescription?: string | null;
   createdBy?: Types.ObjectId | null;
@@ -141,6 +152,21 @@ const productSchema = new Schema<IProduct>(
     attributes: {
       type: [productAttributeSchema],
       default: [],
+    },
+    ratingAverage: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5,
+    },
+    ratingCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    ratingDistribution: {
+      type: Object,
+      default: () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }),
     },
     seoTitle: {
       type: String,

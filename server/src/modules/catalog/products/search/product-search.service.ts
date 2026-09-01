@@ -462,6 +462,8 @@ export class ProductSearchService {
         currency: env.STORE_CURRENCY,
       },
       availableVariantCount: p.availableVariantCount || 0,
+      ratingAverage: p.ratingAverage || 0,
+      ratingCount: p.ratingCount || 0,
     }));
 
     return {
