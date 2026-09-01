@@ -7,6 +7,7 @@ import { ROLE_LABELS, ROLE_COLORS } from '../types/admin.types';
 export const AdminLayout: React.FC = () => {
   const { user } = useAuthStore();
   const canManageStaff = usePermission('admin-user:read');
+  const canReadOrders = usePermission('order:read');
   const canReadCategories = usePermission('category:read');
   const canReadBrands = usePermission('brand:read');
   const canReadProducts = usePermission('product:read');
@@ -14,7 +15,6 @@ export const AdminLayout: React.FC = () => {
 
   const roleStyle = user?.role ? ROLE_COLORS[user.role] : ROLE_COLORS.CUSTOMER;
   const roleName = user?.role ? ROLE_LABELS[user.role] : 'Staff';
-
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col md:flex-row">
@@ -57,6 +57,24 @@ export const AdminLayout: React.FC = () => {
             <span>Admin Overview</span>
           </NavLink>
 
+          {canReadOrders && (
+            <NavLink
+              to="/admin/orders"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Orders</span>
+            </NavLink>
+          )}
+
           {canManageStaff && (
             <NavLink
               to="/admin/users"
@@ -74,6 +92,7 @@ export const AdminLayout: React.FC = () => {
               <span>Staff Users</span>
             </NavLink>
           )}
+
 
           <div className="pt-4 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
             Catalog Management

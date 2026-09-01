@@ -28,6 +28,11 @@ import StorefrontProductsPage from '../features/storefront/pages/StorefrontProdu
 import StorefrontProductDetailPage from '../features/storefront/pages/StorefrontProductDetailPage';
 
 
+import { OrdersPage } from '../features/orders/pages/OrdersPage';
+import { OrderDetailsPage } from '../features/orders/pages/OrderDetailsPage';
+import { AdminOrdersPage } from '../features/orders/pages/AdminOrdersPage';
+import { AdminOrderDetailsPage } from '../features/orders/pages/AdminOrderDetailsPage';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -91,9 +96,16 @@ export const router = createBrowserRouter([
             path: 'checkout',
             element: <CheckoutPage />,
           },
+          {
+            path: 'orders',
+            element: <OrdersPage />,
+          },
+          {
+            path: 'orders/:orderId',
+            element: <OrderDetailsPage />,
+          },
         ],
       },
-
 
       // 404 Not Found
       {
@@ -114,6 +126,19 @@ export const router = createBrowserRouter([
           {
             index: true,
             element: <AdminHomePage />,
+          },
+          {
+            element: <PermissionRoute permission="order:read" />,
+            children: [
+              {
+                path: 'orders',
+                element: <AdminOrdersPage />,
+              },
+              {
+                path: 'orders/:orderId',
+                element: <AdminOrderDetailsPage />,
+              },
+            ],
           },
           {
             element: <PermissionRoute permission="admin-user:read" />,
@@ -173,4 +198,5 @@ export const router = createBrowserRouter([
     ],
   },
 ]);
+
 

@@ -47,7 +47,16 @@ export class AppError extends Error {
     return new AppError(message, 400, ErrorCodes.VALIDATION_ERROR, details);
   }
 
+  static gone(message: string, code: ErrorCode = ErrorCodes.GONE, details?: unknown): AppError {
+    return new AppError(message, 410, code, details);
+  }
+
+  static create(statusCode: number, message: string, code: ErrorCode = ErrorCodes.INTERNAL_SERVER_ERROR, details?: unknown): AppError {
+    return new AppError(message, statusCode, code, details);
+  }
+
   static internal(message: string = 'An unexpected internal error occurred', details?: unknown): AppError {
     return new AppError(message, 500, ErrorCodes.INTERNAL_SERVER_ERROR, details);
   }
 }
+

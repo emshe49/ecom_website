@@ -11,7 +11,9 @@ export const AppLayout: React.FC = () => {
   const { user, isAuthenticated, clearAuth } = useAuthStore();
   const navigate = useNavigate();
 
+  const isStaff = isAuthenticated && user?.role && user.role !== 'CUSTOMER';
   const isCustomer = isAuthenticated && user?.role === 'CUSTOMER';
+  const isGuest = !isAuthenticated;
 
   const { data: cart } = useQuery({
     queryKey: ['cart'],
@@ -23,7 +25,6 @@ export const AppLayout: React.FC = () => {
   const { itemCount: wishlistItemCount } = useWishlist();
 
   const cartTotalQuantity = isCustomer && cart ? cart.totalQuantity : 0;
-
 
   const handleLogout = async () => {
     try {
@@ -42,7 +43,7 @@ export const AppLayout: React.FC = () => {
       <header className="sticky top-0 z-50 border-b border-slate-800 bg-slate-900/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link
-            to="/"
+            to={isStaff ? "/admin" : "/"}
             className="flex items-center gap-2.5 text-white font-bold text-lg tracking-tight hover:opacity-90 transition-opacity"
           >
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
@@ -51,7 +52,7 @@ export const AppLayout: React.FC = () => {
             <span>
               E-Commerce{' '}
               <span className="text-xs font-mono font-normal uppercase px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800/60 ml-1">
-                Monolith
+                {isStaff ? 'Admin Workspace' : 'Monolith'}
               </span>
             </span>
           </Link>
@@ -64,45 +65,57 @@ export const AppLayout: React.FC = () => {
               <span>Explore Shop</span>
             </Link>
 
-            {/* Wishlist Link */}
-            <Link
-              to={isAuthenticated ? '/wishlist' : '/login'}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors border border-slate-800"
-              title="Saved Wishlist"
-            >
-              <Heart className="w-4 h-4 text-rose-400" />
-              <span className="hidden sm:inline">Wishlist</span>
-              {wishlistItemCount > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-mono text-[10px] font-bold shadow-sm shadow-rose-600/50 animate-fadeIn">
-                  {wishlistItemCount}
-                </span>
-              )}
-            </Link>
+            {/* Shopper/Customer Links only: Wishlist & Cart */}
+            {(isCustomer || isGuest) && (
+              <>
+                <Link
+                  to={isAuthenticated ? '/wishlist' : '/login'}
+                  className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors border border-slate-800"
+                  title="Saved Wishlist"
+                >
+                  <Heart className="w-4 h-4 text-rose-400" />
+                  <span className="hidden sm:inline">Wishlist</span>
+                  {wishlistItemCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-rose-600 text-white font-mono text-[10px] font-bold shadow-sm shadow-rose-600/50 animate-fadeIn">
+                      {wishlistItemCount}
+                    </span>
+                  )}
+                </Link>
 
-            {/* Cart Link */}
-            <Link
-              to={isAuthenticated ? '/cart' : '/login'}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors border border-slate-800"
-              title="Shopping Cart"
-            >
-              <ShoppingCart className="w-4 h-4 text-indigo-400" />
-              <span className="hidden sm:inline">Cart</span>
-              {cartTotalQuantity > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white font-mono text-[10px] font-bold shadow-sm shadow-indigo-600/50 animate-fadeIn">
-                  {cartTotalQuantity}
-                </span>
-              )}
-            </Link>
+                <Link
+                  to={isAuthenticated ? '/cart' : '/login'}
+                  className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors border border-slate-800"
+                  title="Shopping Cart"
+                >
+                  <ShoppingCart className="w-4 h-4 text-indigo-400" />
+                  <span className="hidden sm:inline">Cart</span>
+                  {cartTotalQuantity > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full bg-indigo-600 text-white font-mono text-[10px] font-bold shadow-sm shadow-indigo-600/50 animate-fadeIn">
+                      {cartTotalQuantity}
+                    </span>
+                  )}
+                </Link>
+              </>
+            )}
 
+            {/* My Orders Link (Customer only) */}
+            {isCustomer && (
+              <Link
+                to="/orders"
+                className="text-xs font-semibold text-slate-300 hover:text-indigo-400 transition-colors hidden sm:flex items-center gap-1"
+              >
+                <span>My Orders</span>
+              </Link>
+            )}
 
             {isAuthenticated && user ? (
               <div className="flex items-center gap-3">
-                {user.role !== 'CUSTOMER' && (
+                {isStaff && (
                   <Link
                     to="/admin"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold transition-all border border-indigo-500/30"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all border border-indigo-500"
                   >
-                    <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                    <ShieldCheck className="w-3.5 h-3.5 text-white" />
                     <span>Admin Panel</span>
                   </Link>
                 )}
@@ -128,6 +141,7 @@ export const AppLayout: React.FC = () => {
                 </button>
               </div>
             ) : (
+
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"

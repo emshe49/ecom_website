@@ -14,10 +14,13 @@ export const TRANSACTION_TYPE = {
   ADJUSTMENT: 'ADJUSTMENT',
   RESERVATION: 'RESERVATION',
   RELEASE: 'RELEASE',
+  SALE: 'SALE',
+  ORDER_CANCELLATION: 'ORDER_CANCELLATION',
 } as const;
 
 export type TransactionType =
   (typeof TRANSACTION_TYPE)[keyof typeof TRANSACTION_TYPE];
+
 
 export const REFERENCE_TYPE = {
   MANUAL: 'MANUAL',

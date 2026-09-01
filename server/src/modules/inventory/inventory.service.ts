@@ -407,6 +407,146 @@ export class InventoryService {
     };
   }
 
+  /**
+   * Internal service function for Orders to atomically finalize reserved stock into a permanent sale.
+   * Atomically decrements both onHand and reserved:
+   * onHand -= quantity, reserved -= quantity
+   */
+  async finalizeReservation(
+    variantId: Types.ObjectId | string,
+    quantity: number,
+    orderId?: string,
+    reason: string = 'Order creation final inventory consumption'
+  ): Promise<{
+    success: boolean;
+    onHand: number;
+    reserved: number;
+    available: number;
+  }> {
+    if (quantity <= 0 || !Number.isInteger(quantity)) {
+      throw AppError.badRequest(
+        'Finalization quantity must be a positive integer.',
+        ErrorCodes.ERR_INVENTORY_INVALID_QUANTITY
+      );
+    }
+
+    const vId = typeof variantId === 'string' ? new Types.ObjectId(variantId) : variantId;
+    const inv = await this.getOrCreateInventory(vId);
+
+    const prevOnHand = inv.onHand;
+    const prevReserved = inv.reserved;
+
+    // Atomic guard: both reserved and onHand must be >= quantity
+    const updated = await Inventory.findOneAndUpdate(
+      {
+        _id: inv._id,
+        reserved: { $gte: quantity },
+        onHand: { $gte: quantity },
+      },
+      {
+        $inc: {
+          onHand: -quantity,
+          reserved: -quantity,
+        },
+      },
+      { new: true }
+    );
+
+    if (!updated) {
+      throw AppError.badRequest(
+        `Cannot finalize inventory reservation for variant ${vId.toString()}. Insufficient on-hand or reserved stock.`,
+        ErrorCodes.ERR_INVENTORY_INSUFFICIENT_STOCK
+      );
+    }
+
+    // Record immutable SALE audit transaction
+    await InventoryTransaction.create({
+      variantId: vId,
+      type: TRANSACTION_TYPE.SALE,
+      quantity,
+      previousOnHand: prevOnHand,
+      newOnHand: updated.onHand,
+      previousReserved: prevReserved,
+      newReserved: updated.reserved,
+      reason,
+      referenceType: REFERENCE_TYPE.ORDER,
+      referenceId: orderId || null,
+      createdBy: null,
+    });
+
+    return {
+      success: true,
+      onHand: updated.onHand,
+      reserved: updated.reserved,
+      available: Math.max(0, updated.onHand - updated.reserved),
+    };
+  }
+
+  /**
+   * Internal service function for Order cancellation to atomically restore on-hand physical stock.
+   * Atomically increments onHand: onHand += quantity
+   */
+  async restoreStockFromCancellation(
+    variantId: Types.ObjectId | string,
+    quantity: number,
+    orderId?: string,
+    reason: string = 'Order cancellation inventory restoration'
+  ): Promise<{
+    success: boolean;
+    onHand: number;
+    reserved: number;
+    available: number;
+  }> {
+    if (quantity <= 0 || !Number.isInteger(quantity)) {
+      throw AppError.badRequest(
+        'Restoration quantity must be a positive integer.',
+        ErrorCodes.ERR_INVENTORY_INVALID_QUANTITY
+      );
+    }
+
+    const vId = typeof variantId === 'string' ? new Types.ObjectId(variantId) : variantId;
+    const inv = await this.getOrCreateInventory(vId);
+
+    const prevOnHand = inv.onHand;
+    const prevReserved = inv.reserved;
+
+    const updated = await Inventory.findOneAndUpdate(
+      { _id: inv._id },
+      { $inc: { onHand: quantity } },
+      { new: true }
+    );
+
+    if (!updated) {
+      throw AppError.badRequest(
+        `Failed to restore inventory for variant ${vId.toString()}.`,
+        ErrorCodes.ERR_INVENTORY_ADJUSTMENT_INVALID
+      );
+    }
+
+    // Record immutable ORDER_CANCELLATION audit transaction
+    await InventoryTransaction.create({
+      variantId: vId,
+      type: TRANSACTION_TYPE.ORDER_CANCELLATION,
+      quantity,
+      previousOnHand: prevOnHand,
+      newOnHand: updated.onHand,
+      previousReserved: prevReserved,
+      newReserved: updated.reserved,
+      reason,
+      referenceType: REFERENCE_TYPE.ORDER,
+      referenceId: orderId || null,
+      createdBy: null,
+    });
+
+    return {
+      success: true,
+      onHand: updated.onHand,
+      reserved: updated.reserved,
+      available: Math.max(0, updated.onHand - updated.reserved),
+    };
+  }
+
+
 
   /**
    * Admin: List inventory across variants with comprehensive filters, search, and pagination.

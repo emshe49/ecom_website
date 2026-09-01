@@ -33,8 +33,13 @@ export const LoginPage: React.FC = () => {
       setServerError(null);
       const result = await authApi.login(data);
       setAuth(result.user, result.accessToken);
-      navigate(from, { replace: true });
+      if (result.user.role !== 'CUSTOMER') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate(from === '/login' || from === '/register' ? '/' : from, { replace: true });
+      }
     } catch (err: unknown) {
+
       if (err instanceof AxiosError && err.response?.data?.error?.message) {
         setServerError(err.response.data.error.message);
       } else {

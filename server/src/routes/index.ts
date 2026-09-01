@@ -20,6 +20,7 @@ import { cartRouter } from '../modules/cart/cart.routes.js';
 import { wishlistRouter } from '../modules/wishlist/wishlist.routes.js';
 import { inventoryRouter } from '../modules/inventory/inventory.routes.js';
 import { checkoutRouter } from '../modules/checkout/checkout.routes.js';
+import { orderRouter, adminOrderRouter } from '../modules/orders/order.routes.js';
 
 const apiRouter = Router();
 
@@ -51,8 +52,13 @@ v1Router.use('/wishlist', wishlistRouter);
 // Checkout Routes (Module 11)
 v1Router.use('/checkout', checkoutRouter);
 
+// Orders Routes (Module 12)
+v1Router.use('/orders', orderRouter);
+v1Router.use('/admin/orders', adminOrderRouter);
+
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);
+
 
 
 

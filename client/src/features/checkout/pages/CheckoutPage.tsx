@@ -4,7 +4,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ShoppingBag, ArrowLeft, ArrowRight, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { checkoutApi } from '../api/checkout.api';
+import { ordersApi } from '../../orders/api/orders.api';
 import { cartApi } from '../../cart/api/cart.api';
+
 import { CheckoutAddressSelector } from '../components/CheckoutAddressSelector';
 import { CheckoutSummary } from '../components/CheckoutSummary';
 import { CheckoutExpiredState } from '../components/CheckoutExpiredState';
@@ -101,6 +103,28 @@ export const CheckoutPage: React.FC = () => {
     },
   });
 
+  // Place Order Mutation
+  const placeOrderMutation = useMutation({
+
+    mutationFn: (customerNotes?: string) => ordersApi.createOrder({ customerNotes }),
+    onMutate: () => {
+      setErrorMessage(null);
+    },
+    onSuccess: (order) => {
+      queryClient.setQueryData(['checkout'], null);
+      queryClient.invalidateQueries({ queryKey: ['cart'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      navigate(`/orders/${order.id}`);
+    },
+    onError: (err: unknown) => {
+      const axiosError = err as AxiosError<ApiErrorData>;
+      setErrorMessage(
+        axiosError?.response?.data?.error?.message ||
+          'Failed to place order. Please review your checkout or try again.'
+      );
+    },
+  });
+
   // Cancel Checkout Mutation
   const cancelMutation = useMutation({
     mutationFn: checkoutApi.cancelCheckout,
@@ -186,12 +210,15 @@ export const CheckoutPage: React.FC = () => {
           isCancelling={cancelMutation.isPending}
           onRevalidateCheckout={() => revalidateMutation.mutate()}
           isRevalidating={revalidateMutation.isPending}
+          onPlaceOrder={(notes) => placeOrderMutation.mutate(notes)}
+          isPlacingOrder={placeOrderMutation.isPending}
           onExpired={() => setIsSessionExpired(true)}
           errorMessage={errorMessage}
         />
       </div>
     );
   }
+
 
   // 3. Pre-Checkout Address Selection View
   return (

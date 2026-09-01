@@ -21,6 +21,12 @@ export const errorHandler = (
     code = err.code;
     message = err.message;
     details = err.details;
+  } else if (err.name === 'ZodError' || (err as any).issues) {
+    // Zod schema validation error
+    statusCode = 400;
+    code = ErrorCodes.VALIDATION_ERROR;
+    message = 'Request validation failed';
+    details = (err as any).errors || (err as any).issues;
   } else if (err.name === 'ValidationError') {
     // Mongoose validation error
     statusCode = 400;
@@ -42,6 +48,7 @@ export const errorHandler = (
     code = ErrorCodes.BAD_REQUEST;
     message = 'Malformed JSON in request payload';
   }
+
 
   // Log error
   if (statusCode >= 500) {

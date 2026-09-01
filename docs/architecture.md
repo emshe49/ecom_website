@@ -409,6 +409,44 @@ The Wishlist module enables authenticated customers to bookmark products for fut
 | `POST` | `/api/v1/checkout/revalidate` | Yes (CUSTOMER) | Revalidates active session before order creation; updates price changes |
 | `DELETE` | `/api/v1/checkout` | Yes (CUSTOMER) | Cancels the active checkout session and safely releases reserved stock |
 
+---
+
+## 11. Orders Domain Architecture (Module 12)
+
+### 11.1 Key Principles: Immutable Snapshots & Authoritative Order Creation
+1. **Authoritative Checkout-to-Order Conversion**:
+   - Order creation (`POST /api/v1/orders`) strictly requires a valid, `ACTIVE` CheckoutSession. Direct Cart-to-Order creation is forbidden to guarantee price, address, and stock validation.
+   - Idempotency is enforced concurrency-safely via a unique index on `checkoutSessionId`. Duplicate or replayed requests safely return the existing order without duplicate stock decrements.
+2. **Sequential Concurrency-Safe Order Numbers**:
+   - Order numbers follow the format `ORD-YYYY-000001` generated atomically using MongoDB `findAndUpdate` sequence counters per calendar year.
+3. **Immutable Snapshots**:
+   - `items`: Frozen product title, slug, SKU, variant attributes, price, and thumbnail image. Catalog edits or deletions never mutate historical order records.
+   - `shippingAddress` & `billingAddress`: Frozen recipient, address lines, city, state, postal code, phone, and country.
+   - `customerSnapshot`: Frozen first name, last name, email, and phone at the exact time of order placement.
+4. **End-to-End Inventory Finalization & Compensating Rollbacks**:
+   - During order placement, `inventoryService.finalizeReservation()` converts temporary holds into physical sales: atomically decreasing `onHand -= qty` and `reserved -= qty` with a `SALE` transaction record.
+   - If an error occurs midway through item finalization, a compensating rollback automatically restores all processed items.
+   - Cart clearing only happens *after* successful order creation.
+5. **State Machine & Controlled Progression**:
+   - **Statuses**: `PLACED` ➔ `CONFIRMED` ➔ `PROCESSING` ➔ `READY_TO_SHIP` ➔ `SHIPPED` ➔ `DELIVERED` (Terminal: `CANCELLED`).
+   - Customer cancellation is permitted only while `PLACED` or `CONFIRMED`.
+   - Admin cancellation is permitted for any non-terminal, non-delivered order.
+   - Order cancellation atomically executes `restoreStockFromCancellation()` (`onHand += qty`) with an `ORDER_CANCELLATION` transaction record. Double-cancellation is strictly rejected.
+
+### 11.2 Order API Endpoint Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/v1/orders` | Yes (CUSTOMER) | Creates an Order from an active Checkout session, finalizes stock, clears cart |
+| `GET` | `/api/v1/orders` | Yes (CUSTOMER) | Lists current customer's order history with pagination & status filters |
+| `GET` | `/api/v1/orders/:orderId` | Yes (CUSTOMER) | Retrieves customer's isolated order details, item snapshots, & live progress |
+| `POST` | `/api/v1/orders/:orderId/cancel` | Yes (CUSTOMER) | Cancels customer order (if PLACED/CONFIRMED) and restores warehouse stock |
+| `GET` | `/api/v1/admin/orders` | Yes (`order:read`) | Administrative paginated search and filter across all platform orders |
+| `GET` | `/api/v1/admin/orders/:orderId` | Yes (`order:read`) | Full admin order details including allowed transitions & internal notes |
+| `PATCH`| `/api/v1/admin/orders/:orderId/status` | Yes (`order:update_status`) | Transitions order through warehouse fulfillment lifecycle |
+| `POST` | `/api/v1/admin/orders/:orderId/cancel` | Yes (`order:cancel`) | Admin order cancellation override with stock restoration |
+| `PATCH`| `/api/v1/admin/orders/:orderId/notes` | Yes (`order:update_notes`) | Updates internal staff-only operational notes |
+
+
 
 
 
