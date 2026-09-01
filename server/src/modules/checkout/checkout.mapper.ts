@@ -74,7 +74,20 @@ export function toCheckoutSessionDTO(
     items,
     shippingAddress,
     billingAddress,
+    shippingMethod: session.shippingMethod
+      ? {
+          shippingMethodId: session.shippingMethod.shippingMethodId?.toString(),
+          code: session.shippingMethod.code,
+          name: session.shippingMethod.name,
+          fee: session.shippingMethod.fee,
+          currency: session.shippingMethod.currency,
+          estimatedMinDays: session.shippingMethod.estimatedMinDays,
+          estimatedMaxDays: session.shippingMethod.estimatedMaxDays,
+        }
+      : null,
+    shippingFee: session.shippingFee ?? 0,
     subtotal: session.subtotal,
+    total: session.total ?? session.subtotal + (session.shippingFee ?? 0),
     currency: session.currency,
     expiresAt: session.expiresAt.toISOString(),
     remainingSeconds,

@@ -158,8 +158,14 @@ export const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
                 </span>
               </div>
               <div className="flex justify-between text-slate-400">
-                <span>Shipping</span>
-                <span className="text-emerald-400 font-semibold">Free Delivery</span>
+                <span>Shipping ({session.shippingMethod?.name || 'Standard'})</span>
+                {session.shippingFee > 0 ? (
+                  <span className="font-mono font-semibold text-white">
+                    {formatMoney(session.shippingFee, session.currency)}
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-semibold">FREE</span>
+                )}
               </div>
               <div className="flex justify-between text-slate-400">
                 <span>Estimated Tax</span>
@@ -169,7 +175,7 @@ export const CheckoutSummary: React.FC<CheckoutSummaryProps> = ({
               <div className="pt-3 border-t border-slate-800 flex justify-between items-baseline">
                 <span className="text-sm font-bold text-white">Total Amount</span>
                 <span className="text-2xl font-black text-emerald-400 font-mono">
-                  {formatMoney(session.subtotal, session.currency)}
+                  {formatMoney(session.total ?? (session.subtotal + (session.shippingFee || 0)), session.currency)}
                 </span>
               </div>
             </div>

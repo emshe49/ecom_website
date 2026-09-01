@@ -489,6 +489,45 @@ The Wishlist module enables authenticated customers to bookmark products for fut
 | `POST` | `/api/v1/admin/payments/:paymentId/confirm-cod` | Yes (`payment:confirm`) | Authoritatively marks Cash on Delivery collected and Order as PAID |
 | `POST` | `/api/v1/admin/payments/:paymentId/reconcile` | Yes (`payment:reconcile`) | Manually synchronizes payment state against upstream provider status |
 
+---
+
+## 13. Shipping & Fulfillment Domain Architecture (Module 14)
+
+### 13.1 Core Principles: Separation of Concerns, Server Authority & Logistics Control
+1. **Dedicated Shipping Method & Shipment Aggregates**:
+   - `ShippingMethod`: Configurable delivery speeds (Standard, Express, Overnight, Same Day, Free Tiered), authoritative base rates, free-shipping threshold rules (`freeAboveSubtotal`), and country/state/city geographic eligibility.
+   - `Shipment`: Single fulfillment document per Order (`{ orderId: 1 }` unique index). Stores frozen recipient address snapshots, item snapshot duplicates, carrier metadata, public tracking information, internal staff-only operational notes, and immutable milestone status history.
+2. **Authoritative Server Pricing & Free-Shipping Thresholds**:
+   - Shipping fees are calculated dynamically on the server based on checkout items, destination address, and cart subtotal.
+   - If cart `subtotal >= shippingMethod.freeAboveSubtotal`, the quote service automatically waives the fee to `0` minor units.
+   - Client-side total is always verified against `subtotal + shippingFee`.
+3. **Atomic Concurrency-Safe Shipment Identifiers**:
+   - Every shipment receives a human-readable identifier formatted as `SHP-YYYY-NNNNNN` generated atomically via MongoDB `$inc` counters.
+4. **Order State Machine & Payment Dispatch Guard**:
+   - Milestone progression: `PENDING` ➔ `READY_TO_SHIP` ➔ `SHIPPED` ➔ `IN_TRANSIT` ➔ `OUT_FOR_DELIVERY` ➔ `DELIVERED` (Terminal failure/exception: `DELIVERY_FAILED`, `RETURNED_TO_SENDER`, `CANCELLED`).
+   - Order fulfillment status is automatically synchronized with shipment status.
+   - **Payment Dispatch Verification Rule**: Online orders (`order.paymentMethod === 'ONLINE'`) MUST have `order.paymentStatus === 'PAID'` before warehouse dispatch to `SHIPPED` status. Cash on Delivery (`CASH_ON_DELIVERY`) is permitted with `PENDING` payment.
+5. **Customer Privacy & Public Tracking DTO**:
+   - Customer-facing tracking endpoints return a sanitized DTO excluding staff operational notes (`internalNotes`), warehouse staff user IDs, and carrier API secrets.
+
+### 13.2 Shipping API Endpoint Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/shipping/methods` | Public | Returns active shipping methods |
+| `POST` | `/api/v1/shipping/quote` | Yes (CUSTOMER) | Calculates authoritative shipping rates and free-shipping eligibility |
+| `GET` | `/api/v1/shipping/track/:trackingNumber` | Public | Public shipment tracking by tracking number |
+| `GET` | `/api/v1/shipping/orders/:orderId` | Yes (CUSTOMER) | Retrieves customer's shipment details for an order |
+| `GET` | `/api/v1/admin/shipping/methods` | Yes (`shipping:read`) | Lists all shipping methods with configuration |
+| `POST` | `/api/v1/admin/shipping/methods` | Yes (`shipping:manage`) | Creates a new shipping method |
+| `PATCH`| `/api/v1/admin/shipping/methods/:id` | Yes (`shipping:manage`) | Updates shipping method configuration |
+| `DELETE`| `/api/v1/admin/shipping/methods/:id` | Yes (`shipping:manage`) | Soft deletes or deactivates a shipping method |
+| `GET` | `/api/v1/admin/shipping/shipments` | Yes (`shipping:read`/`shipping:fulfill`) | Administrative paginated search and filter for shipments |
+| `POST` | `/api/v1/admin/shipping/orders/:orderId/shipments` | Yes (`shipping:fulfill`) | Creates a new shipment for an order |
+| `GET` | `/api/v1/admin/shipping/shipments/:id` | Yes (`shipping:read`/`shipping:fulfill`) | Detailed administrative shipment view |
+| `PATCH`| `/api/v1/admin/shipping/shipments/:id/status` | Yes (`shipping:fulfill`) | Transitions shipment milestone and synchronizes order status |
+| `PATCH`| `/api/v1/admin/shipping/shipments/:id/tracking` | Yes (`shipping:fulfill`) | Updates carrier name, tracking number, and tracking URL |
+| `POST` | `/api/v1/admin/shipping/shipments/:id/cancel` | Yes (`shipping:fulfill`) | Cancels shipment and marks order as CANCELLED |
+
 
 
 

@@ -70,6 +70,7 @@ export interface OrderListItemDTO {
   paymentStatus: PaymentStatus;
   fulfillmentStatus: FulfillmentStatus;
   subtotal: number;
+  shippingFee: number;
   total: number;
   currency: string;
   itemCount: number;
@@ -89,6 +90,16 @@ export interface OrderDetailDTO {
   items: OrderItemSnapshot[];
   shippingAddress: AddressSnapshot;
   billingAddress: AddressSnapshot;
+  shippingMethod?: {
+    shippingMethodId?: string;
+    code: string;
+    name: string;
+    fee: number;
+    currency: string;
+    estimatedMinDays: number;
+    estimatedMaxDays: number;
+  };
+  shippingFee: number;
   subtotal: number;
   total: number;
   currency: string;

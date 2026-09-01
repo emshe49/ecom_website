@@ -11,11 +11,14 @@ import { Product } from '../catalog/products/product.model.js';
 import { ProductVariant } from '../catalog/products/product-variant.model.js';
 import { inventoryService } from '../inventory/inventory.service.js';
 import { REFERENCE_TYPE } from '../inventory/inventory.constants.js';
+import { ShippingMethod } from '../shipping/shipping-method.model.js';
+import { shippingQuoteService } from '../shipping/shipping-quote.service.js';
 import { CHECKOUT_STATUS, DEFAULT_CHECKOUT_TTL_MINUTES } from './checkout.constants.js';
 import {
   CheckoutSession,
   ICheckoutItemSnapshot,
   ICheckoutSession,
+  ICheckoutShippingMethodSnapshot,
 } from './checkout.model.js';
 import { toAddressSnapshot, toCheckoutSessionDTO } from './checkout.mapper.js';
 import { CheckoutSessionDTO, CreateCheckoutInputDTO } from './checkout.types.js';
@@ -213,7 +216,87 @@ export class CheckoutService {
       }
     }
 
-    // 8. Create and persist CheckoutSession
+    // 8. Resolve and snapshot Shipping Method
+    let shippingMethodSnapshot: ICheckoutShippingMethodSnapshot;
+
+    if (input.shippingMethodId) {
+      if (!Types.ObjectId.isValid(input.shippingMethodId)) {
+        throw AppError.badRequest('Invalid shipping method ID format.', ErrorCodes.BAD_REQUEST);
+      }
+
+      const method = await ShippingMethod.findById(input.shippingMethodId);
+      if (!method) {
+        throw AppError.notFound('Shipping method not found.', ErrorCodes.ERR_SHIPPING_METHOD_NOT_FOUND);
+      }
+
+      if (!method.active) {
+        throw AppError.badRequest('Selected shipping method is no longer active.', ErrorCodes.ERR_SHIPPING_METHOD_INACTIVE);
+      }
+
+      const isEligible = shippingQuoteService.isMethodEligible(
+        method,
+        subtotal,
+        shippingAddress.country,
+        shippingAddress.stateProvince,
+        shippingAddress.city
+      );
+
+      if (!isEligible) {
+        throw AppError.badRequest('Selected shipping method is not eligible for this order.', ErrorCodes.ERR_SHIPPING_METHOD_NOT_ELIGIBLE);
+      }
+
+      const calculatedFee = shippingQuoteService.calculateMethodFee(method, subtotal);
+
+      shippingMethodSnapshot = {
+        shippingMethodId: method._id,
+        code: method.code,
+        name: method.name,
+        fee: calculatedFee,
+        currency: method.currency,
+        estimatedMinDays: method.estimatedMinDays,
+        estimatedMaxDays: method.estimatedMaxDays,
+      };
+    } else {
+      // Fallback: Pick first eligible active shipping method or default standard
+      const activeMethods = await ShippingMethod.find({ active: true }).sort({ sortOrder: 1, baseFee: 1 });
+      const eligibleMethod = activeMethods.find((m) =>
+        shippingQuoteService.isMethodEligible(
+          m,
+          subtotal,
+          shippingAddress.country,
+          shippingAddress.stateProvince,
+          shippingAddress.city
+        )
+      );
+
+      if (eligibleMethod) {
+        const calculatedFee = shippingQuoteService.calculateMethodFee(eligibleMethod, subtotal);
+        shippingMethodSnapshot = {
+          shippingMethodId: eligibleMethod._id,
+          code: eligibleMethod.code,
+          name: eligibleMethod.name,
+          fee: calculatedFee,
+          currency: eligibleMethod.currency,
+          estimatedMinDays: eligibleMethod.estimatedMinDays,
+          estimatedMaxDays: eligibleMethod.estimatedMaxDays,
+        };
+      } else {
+        // Fallback default snapshot
+        shippingMethodSnapshot = {
+          code: 'STANDARD',
+          name: 'Standard Delivery',
+          fee: 0,
+          currency: env.STORE_CURRENCY || 'PKR',
+          estimatedMinDays: 3,
+          estimatedMaxDays: 5,
+        };
+      }
+    }
+
+    const shippingFee = shippingMethodSnapshot.fee;
+    const total = subtotal + shippingFee;
+
+    // 9. Create and persist CheckoutSession
     const ttlMinutes = env.CHECKOUT_SESSION_TTL_MINUTES || DEFAULT_CHECKOUT_TTL_MINUTES;
     const expiresAt = new Date(Date.now() + ttlMinutes * 60 * 1000);
 
@@ -224,8 +307,11 @@ export class CheckoutService {
       items: itemSnapshots,
       shippingAddress: toAddressSnapshot(shippingAddress),
       billingAddress: toAddressSnapshot(billingAddress),
+      shippingMethod: shippingMethodSnapshot,
+      shippingFee,
       subtotal,
-      currency: env.STORE_CURRENCY,
+      total,
+      currency: env.STORE_CURRENCY || 'PKR',
       inventoryReserved: true,
       expiresAt,
       lastValidatedAt: new Date(),
@@ -354,10 +440,47 @@ export class CheckoutService {
       session.subtotal = recalculatedSubtotal;
     }
 
+    // Revalidate Shipping Method
+    let hasShippingChanges = false;
+    if (session.shippingMethod?.shippingMethodId) {
+      const method = await ShippingMethod.findById(session.shippingMethod.shippingMethodId);
+      if (!method || !method.active) {
+        await this.invalidateCheckoutSession(session);
+        throw AppError.badRequest(
+          'Selected shipping method is no longer available.',
+          ErrorCodes.ERR_SHIPPING_METHOD_NOT_ELIGIBLE
+        );
+      }
+
+      const isEligible = shippingQuoteService.isMethodEligible(
+        method,
+        session.subtotal,
+        session.shippingAddress.country,
+        session.shippingAddress.stateProvince,
+        session.shippingAddress.city
+      );
+
+      if (!isEligible) {
+        await this.invalidateCheckoutSession(session);
+        throw AppError.badRequest(
+          'Selected shipping method is no longer eligible for this order total.',
+          ErrorCodes.ERR_SHIPPING_METHOD_NOT_ELIGIBLE
+        );
+      }
+
+      const currentFee = shippingQuoteService.calculateMethodFee(method, session.subtotal);
+      if (currentFee !== session.shippingFee) {
+        session.shippingFee = currentFee;
+        session.shippingMethod.fee = currentFee;
+        hasShippingChanges = true;
+      }
+    }
+
+    session.total = session.subtotal + (session.shippingFee || 0);
     session.lastValidatedAt = new Date();
     await session.save();
 
-    return toCheckoutSessionDTO(session, hasPriceChanges);
+    return toCheckoutSessionDTO(session, hasPriceChanges || hasShippingChanges);
   }
 
   /**

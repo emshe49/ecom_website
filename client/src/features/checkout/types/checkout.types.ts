@@ -38,7 +38,18 @@ export interface CheckoutSession {
   items: CheckoutItemSnapshot[];
   shippingAddress: CheckoutAddressSnapshot;
   billingAddress: CheckoutAddressSnapshot;
+  shippingMethod?: {
+    shippingMethodId?: string;
+    code: string;
+    name: string;
+    fee: number;
+    currency: string;
+    estimatedMinDays: number;
+    estimatedMaxDays: number;
+  };
+  shippingFee: number;
   subtotal: number;
+  total: number;
   currency: string;
   expiresAt: string;
   remainingSeconds: number;
@@ -50,6 +61,7 @@ export interface CheckoutSession {
 
 export interface CreateCheckoutInput {
   shippingAddressId: string;
+  shippingMethodId?: string;
   billingSameAsShipping: boolean;
   billingAddressId?: string;
 }

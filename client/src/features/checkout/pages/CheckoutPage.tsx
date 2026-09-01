@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, Link } from 'react-router-dom';
-import { ShoppingBag, ArrowLeft, ArrowRight, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, ArrowRight, Loader2, AlertCircle, ShieldCheck, Truck } from 'lucide-react';
 import { AxiosError } from 'axios';
 import { checkoutApi } from '../api/checkout.api';
 import { ordersApi } from '../../orders/api/orders.api';
@@ -10,9 +10,10 @@ import { cartApi } from '../../cart/api/cart.api';
 import { CheckoutAddressSelector } from '../components/CheckoutAddressSelector';
 import { CheckoutSummary } from '../components/CheckoutSummary';
 import { CheckoutExpiredState } from '../components/CheckoutExpiredState';
+import { ShippingMethodSelector } from '../../shipping/components/ShippingMethodSelector';
+import { shippingApi } from '../../shipping/api/shipping.api';
 import { CreateCheckoutInput } from '../types/checkout.types';
 import { formatMoney } from '../../../utils/money';
-
 
 interface ApiErrorData {
   error?: {
@@ -26,6 +27,7 @@ export const CheckoutPage: React.FC = () => {
   const navigate = useNavigate();
 
   const [selectedShippingId, setSelectedShippingId] = useState<string | null>(null);
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null);
   const [billingSameAsShipping, setBillingSameAsShipping] = useState<boolean>(true);
   const [selectedBillingId, setSelectedBillingId] = useState<string | null>(null);
 
@@ -51,7 +53,6 @@ export const CheckoutPage: React.FC = () => {
         }
         return null;
       }
-
     },
     retry: false,
   });
@@ -61,6 +62,20 @@ export const CheckoutPage: React.FC = () => {
     queryKey: ['cart'],
     queryFn: cartApi.getCart,
     enabled: !activeSession,
+  });
+
+  // 3. Fetch shipping quote when shipping address is chosen
+  const { data: quoteData, isLoading: isLoadingQuotes } = useQuery({
+    queryKey: ['shipping-quote', selectedShippingId],
+    queryFn: async () => {
+      if (!selectedShippingId) return null;
+      const res = await shippingApi.getQuote(selectedShippingId);
+      if (res.methods && res.methods.length > 0 && !selectedMethodId) {
+        setSelectedMethodId(res.methods[0].id);
+      }
+      return res;
+    },
+    enabled: !!selectedShippingId && !activeSession,
   });
 
   // Create Checkout Session Mutation
@@ -154,6 +169,7 @@ export const CheckoutPage: React.FC = () => {
 
     const input: CreateCheckoutInput = {
       shippingAddressId: selectedShippingId,
+      shippingMethodId: selectedMethodId || undefined,
       billingSameAsShipping,
       billingAddressId: !billingSameAsShipping && selectedBillingId ? selectedBillingId : undefined,
     };
@@ -274,6 +290,28 @@ export const CheckoutPage: React.FC = () => {
               }}
             />
           </div>
+
+          {/* Step 1.2: Shipping Method Selection */}
+          {selectedShippingId && (
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 shadow-xl backdrop-blur-md space-y-4 animate-fadeIn">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-indigo-400" />
+                  <span>Delivery Method & Shipping Speed</span>
+                </h3>
+                <span className="text-xs text-slate-400">
+                  Calculated for destination
+                </span>
+              </div>
+
+              <ShippingMethodSelector
+                methods={quoteData?.methods || []}
+                selectedMethodId={selectedMethodId}
+                onSelect={(m) => setSelectedMethodId(m.id)}
+                isLoading={isLoadingQuotes}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right: Cart Summary Confirmation */}

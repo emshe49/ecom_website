@@ -14,6 +14,10 @@ export const createCheckoutSchema = z
       .string()
       .regex(objectIdRegex, 'Invalid billing address ID format.')
       .optional(),
+    shippingMethodId: z
+      .string()
+      .regex(objectIdRegex, 'Invalid shipping method ID format.')
+      .optional(),
   })
   .strict()
   .refine(

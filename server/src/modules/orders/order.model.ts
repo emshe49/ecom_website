@@ -12,7 +12,10 @@ import {
   ICustomerSnapshot,
   IOrderStatusHistory,
 } from './order.types.js';
-import { ICheckoutAddressSnapshot } from '../checkout/checkout.model.js';
+import {
+  ICheckoutAddressSnapshot,
+  ICheckoutShippingMethodSnapshot,
+} from '../checkout/checkout.model.js';
 
 export interface IOrder extends Document {
   _id: Types.ObjectId;
@@ -26,6 +29,8 @@ export interface IOrder extends Document {
   customerSnapshot: ICustomerSnapshot;
   shippingAddress: ICheckoutAddressSnapshot;
   billingAddress: ICheckoutAddressSnapshot;
+  shippingMethod?: ICheckoutShippingMethodSnapshot;
+  shippingFee: number;
   subtotal: number;
   total: number;
   currency: string;
@@ -282,6 +287,57 @@ const orderSchema = new Schema<IOrder>(
     billingAddress: {
       type: orderAddressSnapshotSchema,
       required: true,
+    },
+    shippingMethod: {
+      shippingMethodId: {
+        type: Schema.Types.ObjectId,
+        ref: 'ShippingMethod',
+      },
+      code: {
+        type: String,
+        required: true,
+        uppercase: true,
+        trim: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      fee: {
+        type: Number,
+        required: true,
+        min: 0,
+        validate: {
+          validator: Number.isInteger,
+          message: '{VALUE} is not an integer value for shipping fee.',
+        },
+      },
+      currency: {
+        type: String,
+        required: true,
+        trim: true,
+        uppercase: true,
+      },
+      estimatedMinDays: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+      estimatedMaxDays: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+    },
+    shippingFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for shipping fee.',
+      },
     },
     subtotal: {
       type: Number,

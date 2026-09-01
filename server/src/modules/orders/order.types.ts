@@ -76,6 +76,16 @@ export interface StatusHistoryDTO {
   changedAt: string;
 }
 
+export interface OrderShippingMethodDTO {
+  shippingMethodId?: string;
+  code: string;
+  name: string;
+  fee: number;
+  currency: string;
+  estimatedMinDays: number;
+  estimatedMaxDays: number;
+}
+
 export interface OrderSummaryDTO {
   id: string;
   orderNumber: string;
@@ -85,6 +95,7 @@ export interface OrderSummaryDTO {
   itemCount: number;
   totalQuantity: number;
   subtotal: number;
+  shippingFee: number;
   total: number;
   currency: string;
   placedAt: string;
@@ -100,6 +111,8 @@ export interface OrderDetailDTO {
   items: OrderItemDTO[];
   shippingAddress: AddressSnapshotDTO;
   billingAddress: AddressSnapshotDTO;
+  shippingMethod?: OrderShippingMethodDTO | null;
+  shippingFee: number;
   subtotal: number;
   total: number;
   currency: string;

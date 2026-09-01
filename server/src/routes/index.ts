@@ -26,6 +26,11 @@ import {
   adminPaymentRoutes,
 } from '../modules/payments/payment.routes.js';
 import { paymentWebhookRoutes } from '../modules/payments/payment-webhook.routes.js';
+import { shippingRouter } from '../modules/shipping/shipping.routes.js';
+import {
+  adminShippingMethodRouter,
+  adminShipmentRouter,
+} from '../modules/shipping/admin-shipping.routes.js';
 
 const apiRouter = Router();
 
@@ -65,6 +70,11 @@ v1Router.use('/admin/orders', adminOrderRouter);
 v1Router.use('/payments', paymentRoutes);
 v1Router.use('/admin/payments', adminPaymentRoutes);
 v1Router.use('/webhooks', paymentWebhookRoutes);
+
+// Shipping & Fulfillment Routes (Module 14)
+v1Router.use('/shipping', shippingRouter);
+v1Router.use('/admin/shipping-methods', adminShippingMethodRouter);
+v1Router.use('/admin/shipments', adminShipmentRouter);
 
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);

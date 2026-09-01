@@ -36,6 +36,9 @@ import { PaymentPage } from '../features/payments/pages/PaymentPage';
 import { PaymentResultPage } from '../features/payments/pages/PaymentResultPage';
 import { AdminPaymentsPage } from '../features/payments/pages/AdminPaymentsPage';
 import { AdminPaymentDetailsPage } from '../features/payments/pages/AdminPaymentDetailsPage';
+import { AdminShippingMethodsPage } from '../features/shipping/pages/AdminShippingMethodsPage';
+import { AdminShipmentsPage } from '../features/shipping/pages/AdminShipmentsPage';
+import { AdminShipmentDetailsPage } from '../features/shipping/pages/AdminShipmentDetailsPage';
 
 export const router = createBrowserRouter([
   {
@@ -162,6 +165,28 @@ export const router = createBrowserRouter([
               {
                 path: 'payments/:paymentId',
                 element: <AdminPaymentDetailsPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute anyPermissions={['shipping:read', 'shipping:fulfill']} />,
+            children: [
+              {
+                path: 'shipments',
+                element: <AdminShipmentsPage />,
+              },
+              {
+                path: 'shipments/:shipmentId',
+                element: <AdminShipmentDetailsPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute permission="shipping:manage" />,
+            children: [
+              {
+                path: 'shipping-methods',
+                element: <AdminShippingMethodsPage />,
               },
             ],
           },

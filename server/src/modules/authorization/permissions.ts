@@ -72,6 +72,11 @@ export const PERMISSIONS = {
   PAYMENT_CONFIRM: 'payment:confirm',
   PAYMENT_RECONCILE: 'payment:reconcile',
 
+  // Shipping & Fulfillment (Module 14)
+  SHIPPING_READ: 'shipping:read',
+  SHIPPING_MANAGE: 'shipping:manage',
+  SHIPPING_FULFILL: 'shipping:fulfill',
+
   // Analytics & Audit
   ANALYTICS_READ: 'analytics:read',
   AUDIT_READ: 'audit:read',

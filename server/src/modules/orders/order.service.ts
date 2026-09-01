@@ -28,6 +28,8 @@ import { inventoryService } from '../inventory/inventory.service.js';
 import { paymentService } from '../payments/payment.service.js';
 import { cartService } from '../cart/cart.service.js';
 import { User } from '../users/user.model.js';
+import { Shipment } from '../shipping/shipment.model.js';
+import { SHIPMENT_STATUS } from '../shipping/shipping.constants.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
@@ -131,8 +133,22 @@ export const orderService = {
       },
       shippingAddress: validatedSession.shippingAddress,
       billingAddress: validatedSession.billingAddress,
+      shippingMethod: validatedSession.shippingMethod
+        ? {
+            shippingMethodId: validatedSession.shippingMethod.shippingMethodId,
+            code: validatedSession.shippingMethod.code,
+            name: validatedSession.shippingMethod.name,
+            fee: validatedSession.shippingMethod.fee,
+            currency: validatedSession.shippingMethod.currency,
+            estimatedMinDays: validatedSession.shippingMethod.estimatedMinDays,
+            estimatedMaxDays: validatedSession.shippingMethod.estimatedMaxDays,
+          }
+        : undefined,
+      shippingFee: validatedSession.shippingFee || 0,
       subtotal: validatedSession.subtotal,
-      total: validatedSession.subtotal,
+      total:
+        validatedSession.total ||
+        validatedSession.subtotal + (validatedSession.shippingFee || 0),
       currency: validatedSession.currency,
       customerNotes: input.customerNotes ? input.customerNotes.trim() : null,
       statusHistory: [
@@ -320,11 +336,28 @@ export const orderService = {
     }
 
     if (!orderStatusService.canCustomerCancelOrder(order)) {
-
       throw AppError.badRequest(
         `Cannot cancel order in '${order.status}' status. Cancellation is only allowed before order is processed.`,
         ErrorCodes.ERR_ORDER_CANNOT_CANCEL
       );
+    }
+
+    // Check Shipment state if a shipment exists
+    const existingShipment = await Shipment.findOne({ orderId: orderObjId });
+    if (existingShipment) {
+      if (
+        [
+          SHIPMENT_STATUS.SHIPPED,
+          SHIPMENT_STATUS.IN_TRANSIT,
+          SHIPMENT_STATUS.OUT_FOR_DELIVERY,
+          SHIPMENT_STATUS.DELIVERED,
+        ].includes(existingShipment.status as any)
+      ) {
+        throw AppError.badRequest(
+          'Cannot cancel order that has already been shipped. Please contact support for returns.',
+          ErrorCodes.ERR_ORDER_ALREADY_SHIPPED
+        );
+      }
     }
 
     const reason = input.reason ? input.reason.trim() : 'Cancelled by customer';
@@ -373,6 +406,19 @@ export const orderService = {
 
     // Safely mark pending payment attempts as cancelled
     await paymentService.cancelPaymentOnOrderCancellation(updated._id);
+
+    // Cancel pending shipment if one exists
+    if (existingShipment && existingShipment.status !== SHIPMENT_STATUS.CANCELLED) {
+      existingShipment.status = SHIPMENT_STATUS.CANCELLED;
+      existingShipment.cancelledAt = new Date();
+      existingShipment.statusHistory.push({
+        status: SHIPMENT_STATUS.CANCELLED,
+        changedBy: customerObjId,
+        note: `Cancelled automatically on customer order cancellation: ${reason}`,
+        changedAt: new Date(),
+      });
+      await existingShipment.save();
+    }
 
     logger.info(`Order ${updated.orderNumber} successfully cancelled by customer ${userId}`);
 
@@ -581,11 +627,28 @@ export const orderService = {
     }
 
     if (!orderStatusService.canAdminCancelOrder(order)) {
-
       throw AppError.badRequest(
         `Cannot cancel order in '${order.status}' status. Orders cannot be cancelled after shipping.`,
         ErrorCodes.ERR_ORDER_CANNOT_CANCEL
       );
+    }
+
+    // Check Shipment state if a shipment exists
+    const existingShipment = await Shipment.findOne({ orderId: order._id });
+    if (existingShipment) {
+      if (
+        [
+          SHIPMENT_STATUS.SHIPPED,
+          SHIPMENT_STATUS.IN_TRANSIT,
+          SHIPMENT_STATUS.OUT_FOR_DELIVERY,
+          SHIPMENT_STATUS.DELIVERED,
+        ].includes(existingShipment.status as any)
+      ) {
+        throw AppError.badRequest(
+          'Cannot cancel order that has already been shipped.',
+          ErrorCodes.ERR_ORDER_ALREADY_SHIPPED
+        );
+      }
     }
 
     const adminObjId = new Types.ObjectId(adminId);
@@ -631,6 +694,19 @@ export const orderService = {
 
     // Safely mark pending payment attempts as cancelled
     await paymentService.cancelPaymentOnOrderCancellation(updated._id);
+
+    // Cancel pending shipment if one exists
+    if (existingShipment && existingShipment.status !== SHIPMENT_STATUS.CANCELLED) {
+      existingShipment.status = SHIPMENT_STATUS.CANCELLED;
+      existingShipment.cancelledAt = new Date();
+      existingShipment.statusHistory.push({
+        status: SHIPMENT_STATUS.CANCELLED,
+        changedBy: adminObjId,
+        note: `Cancelled automatically on admin order cancellation: ${reason}`,
+        changedAt: new Date(),
+      });
+      await existingShipment.save();
+    }
 
     logger.info(`Order ${updated.orderNumber} cancelled by admin ${adminId}. Reason: ${reason}`);
 

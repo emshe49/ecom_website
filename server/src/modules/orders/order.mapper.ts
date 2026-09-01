@@ -64,6 +64,7 @@ export const orderMapper = {
       itemCount: order.items.length,
       totalQuantity,
       subtotal: order.subtotal,
+      shippingFee: order.shippingFee ?? 0,
       total: order.total,
       currency: order.currency,
       placedAt: order.placedAt.toISOString(),
@@ -81,6 +82,18 @@ export const orderMapper = {
       items: order.items.map(this.toOrderItemDTO),
       shippingAddress: this.toAddressDTO(order.shippingAddress),
       billingAddress: this.toAddressDTO(order.billingAddress),
+      shippingMethod: order.shippingMethod
+        ? {
+            shippingMethodId: order.shippingMethod.shippingMethodId?.toString(),
+            code: order.shippingMethod.code,
+            name: order.shippingMethod.name,
+            fee: order.shippingMethod.fee,
+            currency: order.shippingMethod.currency,
+            estimatedMinDays: order.shippingMethod.estimatedMinDays,
+            estimatedMaxDays: order.shippingMethod.estimatedMaxDays,
+          }
+        : null,
+      shippingFee: order.shippingFee ?? 0,
       subtotal: order.subtotal,
       total: order.total,
       currency: order.currency,

@@ -27,6 +27,16 @@ export interface ICheckoutAddressSnapshot {
   addressLine2?: string | null;
 }
 
+export interface ICheckoutShippingMethodSnapshot {
+  shippingMethodId?: Types.ObjectId;
+  code: string;
+  name: string;
+  fee: number;
+  currency: string;
+  estimatedMinDays: number;
+  estimatedMaxDays: number;
+}
+
 export interface ICheckoutSession extends Document {
   _id: Types.ObjectId;
   userId: Types.ObjectId;
@@ -34,7 +44,10 @@ export interface ICheckoutSession extends Document {
   items: ICheckoutItemSnapshot[];
   shippingAddress: ICheckoutAddressSnapshot;
   billingAddress: ICheckoutAddressSnapshot;
+  shippingMethod?: ICheckoutShippingMethodSnapshot;
+  shippingFee: number;
   subtotal: number;
+  total: number;
   currency: string;
   inventoryReserved: boolean;
   expiresAt: Date;
@@ -171,6 +184,53 @@ const checkoutAddressSnapshotSchema = new Schema<ICheckoutAddressSnapshot>(
   { _id: false }
 );
 
+const checkoutShippingMethodSnapshotSchema =
+  new Schema<ICheckoutShippingMethodSnapshot>(
+    {
+      shippingMethodId: {
+        type: Schema.Types.ObjectId,
+        ref: 'ShippingMethod',
+      },
+      code: {
+        type: String,
+        required: true,
+        uppercase: true,
+        trim: true,
+      },
+      name: {
+        type: String,
+        required: true,
+        trim: true,
+      },
+      fee: {
+        type: Number,
+        required: true,
+        min: 0,
+        validate: {
+          validator: Number.isInteger,
+          message: '{VALUE} is not an integer value for shipping fee.',
+        },
+      },
+      currency: {
+        type: String,
+        required: true,
+        trim: true,
+        uppercase: true,
+      },
+      estimatedMinDays: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+      estimatedMaxDays: {
+        type: Number,
+        required: true,
+        min: 0,
+      },
+    },
+    { _id: false }
+  );
+
 const checkoutSessionSchema = new Schema<ICheckoutSession>(
   {
     userId: {
@@ -202,6 +262,19 @@ const checkoutSessionSchema = new Schema<ICheckoutSession>(
       type: checkoutAddressSnapshotSchema,
       required: true,
     },
+    shippingMethod: {
+      type: checkoutShippingMethodSnapshotSchema,
+      default: null,
+    },
+    shippingFee: {
+      type: Number,
+      default: 0,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for shipping fee.',
+      },
+    },
     subtotal: {
       type: Number,
       required: true,
@@ -209,6 +282,15 @@ const checkoutSessionSchema = new Schema<ICheckoutSession>(
       validate: {
         validator: Number.isInteger,
         message: '{VALUE} is not an integer value for subtotal.',
+      },
+    },
+    total: {
+      type: Number,
+      required: true,
+      min: 0,
+      validate: {
+        validator: Number.isInteger,
+        message: '{VALUE} is not an integer value for total.',
       },
     },
     currency: {

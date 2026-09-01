@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { ordersApi } from '../api/orders.api';
+import { shippingApi } from '../../shipping/api/shipping.api';
 import { AdminOrderDetailDTO, OrderStatus } from '../orders.types';
 import { OrderStatusBadge } from '../components/OrderStatusBadge';
 import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
+import { ShipmentStatusBadge } from '../../shipping/components/ShipmentStatusBadge';
+import { CreateShipmentModal } from '../../shipping/components/CreateShipmentModal';
 import { OrderTimeline } from '../components/OrderTimeline';
 import { OrderItemsTable } from '../components/OrderItemsTable';
 import { CancelOrderModal } from '../components/CancelOrderModal';
@@ -15,6 +19,9 @@ import {
   CheckSquare,
   MessageSquare,
   AlertTriangle,
+  Truck,
+  ExternalLink,
+  Plus,
 } from 'lucide-react';
 
 export const AdminOrderDetailsPage: React.FC = () => {
@@ -23,6 +30,22 @@ export const AdminOrderDetailsPage: React.FC = () => {
   const [order, setOrder] = useState<AdminOrderDetailDTO | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Shipment state & modal
+  const [isShipmentModalOpen, setIsShipmentModalOpen] = useState<boolean>(false);
+  const [isCreatingShipment, setIsCreatingShipment] = useState<boolean>(false);
+
+  const { data: shipment, refetch: refetchShipment } = useQuery({
+    queryKey: ['admin-order-shipment', orderId],
+    queryFn: async () => {
+      try {
+        return await shippingApi.getShipmentByOrderId(orderId!);
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!orderId,
+  });
 
   // Status transition state
   const [selectedNextStatus, setSelectedNextStatus] = useState<string>('');
@@ -204,6 +227,57 @@ export const AdminOrderDetailsPage: React.FC = () => {
             <p className="text-2xl font-extrabold text-indigo-400 mt-0.5">
               {formatPrice(order.total, order.currency)}
             </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Shipment / Logistics Card */}
+      <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800/80 rounded-2xl p-6 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+              <Truck className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-base font-bold text-white">
+                  Fulfillment Shipment
+                </h3>
+                {shipment && <ShipmentStatusBadge status={shipment.status} />}
+              </div>
+              {shipment ? (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Shipment <span className="font-mono font-bold text-indigo-300">#{shipment.shipmentNumber}</span> via{' '}
+                  <span className="font-semibold text-slate-200">{shipment.carrierName || shipment.carrier}</span>
+                  {shipment.trackingNumber && <span> (Tracking: {shipment.trackingNumber})</span>}
+                </p>
+              ) : (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Method: <span className="font-semibold text-slate-200">{order.shippingMethod?.name || 'Standard Delivery'}</span> (Fee: {formatPrice(order.shippingFee, order.currency)})
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            {shipment ? (
+              <Link
+                to={`/admin/shipments/${shipment.id}`}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-colors"
+              >
+                <span>View Shipment Details</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </Link>
+            ) : order.status !== 'CANCELLED' && order.status !== 'DELIVERED' ? (
+              <button
+                type="button"
+                onClick={() => setIsShipmentModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Shipment</span>
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -423,6 +497,25 @@ export const AdminOrderDetailsPage: React.FC = () => {
         onClose={() => setIsCancelModalOpen(false)}
         onConfirm={handleAdminCancelConfirm}
         isLoading={isCancelling}
+      />
+
+      {/* Create Fulfillment Shipment Modal */}
+      <CreateShipmentModal
+        orderId={order.id}
+        orderNumber={order.orderNumber}
+        isOpen={isShipmentModalOpen}
+        onClose={() => setIsShipmentModalOpen(false)}
+        onSubmit={async (data) => {
+          setIsCreatingShipment(true);
+          try {
+            await shippingApi.createShipmentForOrder(order.id, data);
+            await refetchShipment();
+            await fetchOrderDetail();
+          } finally {
+            setIsCreatingShipment(false);
+          }
+        }}
+        isLoading={isCreatingShipment}
       />
     </div>
   );

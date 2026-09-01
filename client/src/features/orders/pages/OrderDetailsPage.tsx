@@ -7,6 +7,9 @@ import { PaymentStatusBadge } from '../components/PaymentStatusBadge';
 import { OrderTimeline } from '../components/OrderTimeline';
 import { OrderItemsTable } from '../components/OrderItemsTable';
 import { CancelOrderModal } from '../components/CancelOrderModal';
+import { ShipmentTrackingCard } from '../../shipping/components/ShipmentTrackingCard';
+import { shippingApi } from '../../shipping/api/shipping.api';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
   MapPin,
@@ -23,6 +26,18 @@ export const OrderDetailsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
   const [isCancelling, setIsCancelling] = useState<boolean>(false);
+
+  const { data: shipment } = useQuery({
+    queryKey: ['order-shipment', orderId],
+    queryFn: async () => {
+      try {
+        return await shippingApi.getOrderShipment(orderId!);
+      } catch {
+        return null;
+      }
+    },
+    enabled: !!orderId,
+  });
 
   const fetchOrderDetail = async () => {
     if (!orderId) return;
@@ -186,6 +201,13 @@ export const OrderDetailsPage: React.FC = () => {
       </div>
 
 
+      {/* Shipment Tracking Card (if shipment created) */}
+      {shipment && (
+        <div className="animate-fadeIn">
+          <ShipmentTrackingCard shipment={shipment} />
+        </div>
+      )}
+
       {/* Lifecycle Progress Tracker */}
       <OrderTimeline
         currentStatus={order.status}
@@ -252,8 +274,16 @@ export const OrderDetailsPage: React.FC = () => {
                 <span>{formatPrice(order.subtotal, order.currency)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Shipping</span>
-                <span className="text-emerald-400 font-medium">Free</span>
+                <span className="text-slate-400">
+                  Shipping {order.shippingMethod?.name ? `(${order.shippingMethod.name})` : ''}
+                </span>
+                {order.shippingFee > 0 ? (
+                  <span className="text-slate-200 font-medium">
+                    {formatPrice(order.shippingFee, order.currency)}
+                  </span>
+                ) : (
+                  <span className="text-emerald-400 font-medium">FREE</span>
+                )}
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Taxes</span>
