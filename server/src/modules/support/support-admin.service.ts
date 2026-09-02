@@ -21,6 +21,14 @@ import { supportNotificationService } from './support-notification.service.js';
 import { supportMapper } from './support.mapper.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
+import { auditService } from '../audit/audit.service.js';
+import {
+  AUDIT_EVENT_TYPE,
+  AUDIT_CATEGORY,
+  ACTOR_TYPE,
+  AUDIT_OUTCOME,
+  TARGET_TYPE,
+} from '../audit/audit.constants.js';
 import {
   StaffTicketListItemDTO,
   StaffTicketDetailDTO,
@@ -337,6 +345,25 @@ export class SupportAdminService {
     ticket.lastMessageAt = now;
     await ticket.save();
 
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.SUPPORT_INTERNAL_NOTE_CREATED,
+      category: AUDIT_CATEGORY.SUPPORT,
+      action: 'INTERNAL_NOTE_CREATED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: staffUserId,
+      },
+      target: {
+        targetType: TARGET_TYPE.SUPPORT_TICKET,
+        targetId: ticket._id.toString(),
+        targetDisplay: ticket.ticketNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      metadata: {
+        messageId: message._id.toString(),
+      },
+    }).catch(() => {});
+
     const senderNameMap = new Map<string, string>();
     if (staff) {
       senderNameMap.set(
@@ -388,6 +415,25 @@ export class SupportAdminService {
       toValue: targetStaffId,
     });
 
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.SUPPORT_TICKET_ASSIGNED,
+      category: AUDIT_CATEGORY.SUPPORT,
+      action: 'TICKET_ASSIGNED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: currentStaffId,
+      },
+      target: {
+        targetType: TARGET_TYPE.SUPPORT_TICKET,
+        targetId: ticket._id.toString(),
+        targetDisplay: ticket.ticketNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { assignedTo: oldAssigneeId },
+      after: { assignedTo: targetStaffId },
+      changedFields: ['assignedTo'],
+    }).catch(() => {});
+
     await supportNotificationService.notifyTicketAssigned(ticket, targetStaffId);
 
     return { success: true, assignedTo: targetStaffId };
@@ -438,6 +484,25 @@ export class SupportAdminService {
       toValue: staffUserId,
     });
 
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.SUPPORT_TICKET_ASSIGNED,
+      category: AUDIT_CATEGORY.SUPPORT,
+      action: 'TICKET_ASSIGNED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: staffUserId,
+      },
+      target: {
+        targetType: TARGET_TYPE.SUPPORT_TICKET,
+        targetId: ticket._id.toString(),
+        targetDisplay: ticket.ticketNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { assignedTo: null },
+      after: { assignedTo: staffUserId },
+      changedFields: ['assignedTo'],
+    }).catch(() => {});
+
     return { success: true, assignedTo: staffUserId };
   }
 
@@ -470,6 +535,25 @@ export class SupportAdminService {
       fromValue: oldPriority,
       toValue: priority,
     });
+
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.SUPPORT_TICKET_PRIORITY_CHANGED,
+      category: AUDIT_CATEGORY.SUPPORT,
+      action: 'PRIORITY_CHANGED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: staffUserId,
+      },
+      target: {
+        targetType: TARGET_TYPE.SUPPORT_TICKET,
+        targetId: ticket._id.toString(),
+        targetDisplay: ticket.ticketNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { priority: oldPriority },
+      after: { priority },
+      changedFields: ['priority'],
+    }).catch(() => {});
 
     return { success: true, priority };
   }
@@ -505,6 +589,25 @@ export class SupportAdminService {
         fromValue: oldStatus,
         toValue: status,
       });
+
+      auditService.recordAuditEvent({
+        eventType: AUDIT_EVENT_TYPE.SUPPORT_TICKET_STATUS_CHANGED,
+        category: AUDIT_CATEGORY.SUPPORT,
+        action: 'STATUS_CHANGED',
+        actor: {
+          actorType: ACTOR_TYPE.ADMIN,
+          actorUserId: staffUserId,
+        },
+        target: {
+          targetType: TARGET_TYPE.SUPPORT_TICKET,
+          targetId: ticket._id.toString(),
+          targetDisplay: ticket.ticketNumber,
+        },
+        outcome: AUDIT_OUTCOME.SUCCESS,
+        before: { status: oldStatus },
+        after: { status },
+        changedFields: ['status'],
+      }).catch(() => {});
     }
 
     return { success: true, status };
@@ -556,6 +659,26 @@ export class SupportAdminService {
       toValue: TICKET_STATUS.RESOLVED,
       metadata: { resolutionSummary: ticket.resolutionSummary },
     });
+
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.SUPPORT_TICKET_RESOLVED,
+      category: AUDIT_CATEGORY.SUPPORT,
+      action: 'TICKET_RESOLVED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: staffUserId,
+      },
+      target: {
+        targetType: TARGET_TYPE.SUPPORT_TICKET,
+        targetId: ticket._id.toString(),
+        targetDisplay: ticket.ticketNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { status: oldStatus },
+      after: { status: TICKET_STATUS.RESOLVED },
+      changedFields: ['status'],
+      metadata: { resolutionSummary: ticket.resolutionSummary },
+    }).catch(() => {});
 
     const customer = await User.findById(ticket.customerId).lean();
     if (customer) {

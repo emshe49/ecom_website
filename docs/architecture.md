@@ -658,6 +658,129 @@ Support tickets follow a deterministic transition lifecycle managed by `supportT
 | `POST` | `/api/v1/admin/support/tickets/:ticketId/close` | Staff (`support:write`) | Administratively close ticket |
 | `POST` | `/api/v1/admin/support/tickets/:ticketId/read` | Staff (`support:read`) | Clear staff unread badge count |
 
+---
+
+## 16. Module 23 — Audit Logs & Security Activity Tracking
+
+### 16.1 Architectural Philosophy
+
+Module 23 provides a **secure, append-only, cryptographically tamper-evident audit trail** for all important security, administrative, financial, and operational actions across the platform. Critically, audit is implemented as a **modular in-process service** — never as a separate microservice, separate database, or external log-shipping infrastructure (no Elasticsearch, Splunk, Kafka, or SIEM).
+
+**Core Design Invariants:**
+- **Append-Only**: Zero `PATCH`/`DELETE` routes exposed anywhere in the audit API surface.
+- **Non-Blocking**: `auditService.recordAuditEvent()` is always called in a fire-and-forget style. If the audit insert fails, the primary business operation (e.g., Order creation, Role change) is never rolled back.
+- **Defense-in-Depth Redaction**: Sensitive fields are stripped at two layers — a denylist-based sanitizer (`auditRedactionService.sanitize()`) and a domain-specific allowlist (`SNAPSHOT_ALLOWLISTS`) for `before`/`after` snapshots.
+
+---
+
+### 16.2 Data Model
+
+**Collection: `audit_logs`** — Indexed on `createdAt`, `actorUserId`, `eventType`, `category`, `outcome`, `targetId`.
+
+| Field | Type | Description |
+|:------|:-----|:------------|
+| `eventType` | `String` | Dot-notation event label (e.g., `auth.login.success`, `rbac.role.changed`) |
+| `category` | `String` | Domain category (`AUTH`, `SECURITY`, `USER`, `RBAC`, `ORDER`, `PAYMENT`, etc.) |
+| `action` | `String` | Human-readable verb phrase (`LOGIN`, `ROLE_CHANGED`, `INVENTORY_ADJUSTED`) |
+| `actorType` | `String` | `USER`, `ADMIN`, `SYSTEM`, `WEBHOOK`, `JOB` |
+| `actorUserId` | `ObjectId?` | The authenticated user who performed the action (null for system/webhook) |
+| `actorRoleSnapshot` | `String?` | Role of actor **at time of event** (immutable historical record) |
+| `targetType` | `String?` | Resource domain targeted (`USER`, `ORDER`, `PRODUCT`, etc.) |
+| `targetId` | `String?` | Stringified target ID |
+| `targetDisplay` | `String?` | Human-readable display label (e.g., email hash, order number) |
+| `outcome` | `String` | `SUCCESS`, `FAILURE`, `DENIED` |
+| `failureCode` | `String?` | Application error code if outcome is `FAILURE` or `DENIED` |
+| `before` | `Object?` | Pre-mutation state snapshot (allowlist-filtered per domain) |
+| `after` | `Object?` | Post-mutation state snapshot (allowlist-filtered per domain) |
+| `changedFields` | `String[]?` | Field-level diff of changed keys |
+| `metadata` | `Object?` | Auxiliary context (denylist-sanitized, bounded to 32 KB) |
+| `requestId` | `String?` | Correlation ID from `X-Request-Id` header |
+| `ipAddress` | `String?` | Client IP from `req.ip` |
+| `userAgent` | `String?` | Truncated UA string (max 512 chars) |
+| `httpMethod` | `String?` | HTTP verb (`GET`, `POST`, `PATCH`, etc.) |
+| `route` | `String?` | Normalized route path (query string stripped) |
+| `recordHash` | `String` | SHA-256 tamper-evident hash of canonical record data |
+| `previousHash` | `String` | Hash of the immediately preceding record (chain link) |
+| `createdAt` | `Date` | Immutable creation timestamp |
+
+**Collection: `audit_chain_state`** — Singleton record `{ chainId: 'global_chain', latestHash, sequenceNumber, updatedAt }` stores the rolling chain tip for atomic hash chain advancement.
+
+---
+
+### 16.3 Tamper-Evident SHA-256 Hash Chain
+
+Each audit record is cryptographically chained to its predecessor:
+
+```
+recordHash = SHA256( previousHash + ":" + canonicalJSON(record_fields_excluding_hash) )
+```
+
+- **Canonical JSON**: Object keys recursively sorted alphabetically, non-serializable values excluded, so the hash is deterministic.
+- **Genesis Hash**: The first record in an empty chain uses `previousHash = '0'.repeat(64)`.
+- **Verification**: `auditHashService.verifyRecord(doc)` recomputes the expected hash and compares to `doc.recordHash`. A mismatch indicates tampering.
+- **Chain State Atomicity**: Chain state is read and updated via `findOneAndUpdate` (single-document atomicity) to prevent duplicate hash advances.
+
+---
+
+### 16.4 Secret Redaction System
+
+Two-layer defense-in-depth redaction before any data is persisted:
+
+**Layer 1 — Denylist Sanitizer** (applied to `metadata`):
+Recursively scans all keys using regex patterns. Keys matching the following are replaced with `'[REDACTED]'`: `password`, `token`, `secret`, `authorization`, `cookie`, `cvv`, `card`, `apikey`, `privatekey`, `smtppassword`, `credentials`, `session`, `auth`.
+
+**Layer 2 — Domain Allowlist** (applied to `before`/`after` snapshots):
+Only pre-approved fields per domain are stored. Examples:
+- `USER`: `email`, `role`, `isActive`, `firstName`, `lastName`
+- `ORDER`: `status`, `paymentStatus`, `fulfillmentStatus`, `totalAmount`, `cancellationReason`
+- `INVENTORY`: `onHand`, `reserved`, `lowStockThreshold`, `reason`
+- `RBAC`: `role`, `previousRole`
+
+**Metadata Bounding**: Sanitized metadata exceeding 32 KB is replaced with a truncation warning summary to prevent storage exhaustion.
+
+---
+
+### 16.5 Domain Event Coverage
+
+Audit recording is hooked inside-process across all modules:
+
+| Module | Events Captured |
+|:-------|:----------------|
+| **Auth** (M02) | `auth.login.success`, `auth.login.failed` (SHA-256 hashed email for unknown identifiers), `auth.logout`, `auth.email_verified`, `auth.password.changed` |
+| **Authorization** (M04) | `security.permission.denied` (with required permission metadata) |
+| **Users/RBAC** (M03/M04) | `user.created_by_admin`, `rbac.role.changed` (before/after role), `user.status.changed` |
+| **Inventory** (M10) | `inventory.adjusted` (before/after stock, transaction ID, reason) |
+| **Orders** (M12) | `order.status_changed`, `order.cancelled` |
+| **Payments** (M13) | `payment.cod_confirmed`, `payment.succeeded`, `payment.failed` (via webhook — actor type `WEBHOOK`) |
+| **Support** (M22) | `support.ticket.assigned`, `support.ticket.priority_changed`, `support.ticket.status_changed`, `support.ticket.resolved`, `support.internal_note.created` (metadata only — note text never stored) |
+
+---
+
+### 16.6 Security Controls (AUDIT-SEC-01..10)
+
+1. **AUDIT-SEC-01 (RBAC Access)**: All audit endpoints require `authenticate`. Listing requires `audit:read`. Exporting requires `audit:export`. Customers and non-privileged roles receive `403 Forbidden`.
+2. **AUDIT-SEC-02 (Secret Redaction)**: Passwords, tokens, Authorization headers, secrets, CVV, card numbers, SMTP credentials, and API keys are stripped before persistence. Metadata bounded to 32 KB.
+3. **AUDIT-SEC-03 (Tamper-Evident Chain)**: SHA-256 hash chain ensures any in-database modification of a record is detectable via hash mismatch.
+4. **AUDIT-SEC-04 (Cryptographic Verification Endpoint)**: `GET /api/v1/admin/audit/:auditLogId/verify` returns `{ isValid, recordHash, previousHash, verifiedAt }`.
+5. **AUDIT-SEC-05 (Bounded Query Engine)**: Date ranges default to 30 days, capped at 365 days. Limit capped at 100. MongoDB operator injection via query strings is rejected by Zod schema.
+6. **AUDIT-SEC-06 (Append-Only Routes)**: `POST`, `PATCH`, and `DELETE` to audit endpoints return `404 Not Found`. Zero mutation surfaces.
+7. **AUDIT-SEC-07 (CSV Export & Formula Injection)**: CSV cells starting with `=`, `+`, `-`, `@`, `\t`, `\r` are prefixed with `'` to neutralize spreadsheet formula injection attacks.
+8. **AUDIT-SEC-08 (Non-Blocking Isolation)**: `recordAuditEvent` never throws to its caller. `null`/invalid input is handled gracefully. DB failures are logged without disrupting the primary business transaction.
+9. **AUDIT-SEC-09 (Request Correlation)**: `requestIdMiddleware` attaches a UUID v4 `X-Request-Id` header to every response. Provided client IDs are echoed and stored in audit records for cross-system correlation.
+10. **AUDIT-SEC-10 (End-to-End Event Capture)**: Key lifecycle events across Auth, RBAC, Orders, Inventory, Payments, and Support are automatically captured with correct actor attribution.
+
+---
+
+### 16.7 Audit API Catalog
+
+| Method | Endpoint | Auth Required | Description |
+|:-------|:---------|:-------------:|:------------|
+| `GET` | `/api/v1/admin/audit` | `audit:read` | List audit logs with filters, pagination, and actor resolution. Heavy `before`/`after`/`metadata` fields excluded from list projection. |
+| `GET` | `/api/v1/admin/audit/:auditLogId` | `audit:read` | Get full audit log detail including snapshots, hash chain links, and inline hash verification status. |
+| `GET` | `/api/v1/admin/audit/:auditLogId/verify` | `audit:read` | Cryptographically verify record hash integrity. Returns `{ isValid, recordHash, previousHash, verifiedAt }`. |
+| `GET` | `/api/v1/admin/audit/export` | `audit:export` | Stream CSV export of audit logs. Bounded at 50,000 rows. Formula injection sanitized. |
+
+
 
 
 

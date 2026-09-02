@@ -35,6 +35,14 @@ import { notificationService } from '../notifications/notification.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
+import { auditService } from '../audit/audit.service.js';
+import {
+  AUDIT_EVENT_TYPE,
+  AUDIT_CATEGORY,
+  ACTOR_TYPE,
+  AUDIT_OUTCOME,
+  TARGET_TYPE,
+} from '../audit/audit.constants.js';
 
 export const paymentService = {
   /**
@@ -561,6 +569,28 @@ export const paymentService = {
           parsedEvent.providerTransactionId,
           parsedEvent.providerPaymentId
         );
+
+        auditService.recordAuditEvent({
+          eventType: AUDIT_EVENT_TYPE.PAYMENT_SUCCEEDED,
+          category: AUDIT_CATEGORY.PAYMENT,
+          action: 'PAYMENT_SUCCEEDED',
+          actor: {
+            actorType: ACTOR_TYPE.WEBHOOK,
+            actorUserId: null,
+          },
+          target: {
+            targetType: TARGET_TYPE.PAYMENT,
+            targetId: payment._id.toString(),
+            targetDisplay: payment.paymentNumber,
+          },
+          outcome: AUDIT_OUTCOME.SUCCESS,
+          metadata: {
+            provider: providerName,
+            providerEventId: parsedEvent.providerEventId,
+            amount: payment.amount,
+            currency: payment.currency,
+          },
+        }).catch(() => {});
       } else if (parsedEvent.status === 'FAILED') {
         await this.markPaymentFailed(
           payment._id,
@@ -568,6 +598,27 @@ export const paymentService = {
           parsedEvent.failureCode,
           parsedEvent.failureMessage
         );
+
+        auditService.recordAuditEvent({
+          eventType: AUDIT_EVENT_TYPE.PAYMENT_FAILED,
+          category: AUDIT_CATEGORY.PAYMENT,
+          action: 'PAYMENT_FAILED',
+          actor: {
+            actorType: ACTOR_TYPE.WEBHOOK,
+            actorUserId: null,
+          },
+          target: {
+            targetType: TARGET_TYPE.PAYMENT,
+            targetId: payment._id.toString(),
+            targetDisplay: payment.paymentNumber,
+          },
+          outcome: AUDIT_OUTCOME.FAILURE,
+          failureCode: parsedEvent.failureCode || 'ERR_PAYMENT_FAILED',
+          metadata: {
+            provider: providerName,
+            providerEventId: parsedEvent.providerEventId,
+          },
+        }).catch(() => {});
       } else if (parsedEvent.status === 'CANCELLED') {
         await this.markPaymentCancelled(payment._id, attempt?._id);
       }
@@ -645,6 +696,30 @@ export const paymentService = {
     logger.info(
       `Admin ${adminId} confirmed COD payment collection for Payment ${payment.paymentNumber}`
     );
+
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.PAYMENT_COD_CONFIRMED,
+      category: AUDIT_CATEGORY.PAYMENT,
+      action: 'COD_CONFIRMED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: adminId,
+      },
+      target: {
+        targetType: TARGET_TYPE.PAYMENT,
+        targetId: payment._id.toString(),
+        targetDisplay: payment.paymentNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      after: {
+        status: PAYMENT_STATUS.SUCCEEDED,
+        amount: payment.amount,
+      },
+      metadata: {
+        orderId: payment.orderId.toString(),
+        note: input.note || null,
+      },
+    }).catch(() => {});
 
     return this.getAdminPaymentById(paymentId);
   },

@@ -35,6 +35,14 @@ import { notificationService } from '../notifications/notification.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
+import { auditService } from '../audit/audit.service.js';
+import {
+  AUDIT_EVENT_TYPE,
+  AUDIT_CATEGORY,
+  ACTOR_TYPE,
+  AUDIT_OUTCOME,
+  TARGET_TYPE,
+} from '../audit/audit.constants.js';
 import { eventBus, EVENTS } from '../../shared/events/event-bus.js';
 
 export const orderService = {
@@ -493,6 +501,26 @@ export const orderService = {
 
     logger.info(`Order ${updated.orderNumber} successfully cancelled by customer ${userId}`);
 
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.ORDER_CANCELLED,
+      category: AUDIT_CATEGORY.ORDER,
+      action: 'ORDER_CANCELLED',
+      actor: {
+        actorType: ACTOR_TYPE.USER,
+        actorUserId: userId,
+      },
+      target: {
+        targetType: TARGET_TYPE.ORDER,
+        targetId: updated._id.toString(),
+        targetDisplay: updated.orderNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { status: order.status },
+      after: { status: ORDER_STATUS.CANCELLED },
+      changedFields: ['status'],
+      metadata: { reason },
+    }).catch(() => {});
+
     // Notify customer of order cancellation
     notificationService
       .notifyOrderEvent(userId, updated._id.toString(), updated.orderNumber, ORDER_STATUS.CANCELLED)
@@ -674,6 +702,34 @@ export const orderService = {
 
     logger.info(`Order ${updated.orderNumber} status changed from ${order.status} to ${newStatus} by admin ${adminId}`);
 
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.ORDER_STATUS_CHANGED,
+      category: AUDIT_CATEGORY.ORDER,
+      action: 'STATUS_CHANGED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: adminId,
+      },
+      target: {
+        targetType: TARGET_TYPE.ORDER,
+        targetId: updated._id.toString(),
+        targetDisplay: updated.orderNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: {
+        status: order.status,
+        fulfillmentStatus: order.fulfillmentStatus,
+      },
+      after: {
+        status: newStatus,
+        fulfillmentStatus: mappedFulfillment,
+      },
+      changedFields: ['status', 'fulfillmentStatus'],
+      metadata: {
+        note: note ? note.trim() : null,
+      },
+    }).catch(() => {});
+
     // Notify customer of order status update
     notificationService
       .notifyOrderEvent(updated.userId.toString(), updated._id.toString(), updated.orderNumber, newStatus)
@@ -795,6 +851,26 @@ export const orderService = {
     }
 
     logger.info(`Order ${updated.orderNumber} cancelled by admin ${adminId}. Reason: ${reason}`);
+
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.ORDER_CANCELLED,
+      category: AUDIT_CATEGORY.ORDER,
+      action: 'ORDER_CANCELLED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: adminId,
+      },
+      target: {
+        targetType: TARGET_TYPE.ORDER,
+        targetId: updated._id.toString(),
+        targetDisplay: updated.orderNumber,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { status: order.status },
+      after: { status: ORDER_STATUS.CANCELLED },
+      changedFields: ['status'],
+      metadata: { reason },
+    }).catch(() => {});
 
     // Notify customer of admin cancellation
     notificationService

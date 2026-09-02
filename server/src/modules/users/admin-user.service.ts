@@ -11,6 +11,14 @@ import {
 import { eventBus, EVENTS } from '../../shared/events/event-bus.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
+import { auditService } from '../audit/audit.service.js';
+import {
+  AUDIT_EVENT_TYPE,
+  AUDIT_CATEGORY,
+  ACTOR_TYPE,
+  AUDIT_OUTCOME,
+  TARGET_TYPE,
+} from '../audit/audit.constants.js';
 
 export class AdminUserService {
   async createStaffUser(_creatorId: string, dto: CreateStaffDTO): Promise<SafeUser> {
@@ -46,6 +54,28 @@ export class AdminUserService {
 
     await staffUser.save();
 
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.USER_CREATED_BY_ADMIN,
+      category: AUDIT_CATEGORY.USER,
+      action: 'USER_CREATED_BY_ADMIN',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: _creatorId,
+      },
+      target: {
+        targetType: TARGET_TYPE.USER,
+        targetId: staffUser._id.toString(),
+        targetDisplay: staffUser.email,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      after: {
+        email: staffUser.email,
+        role: staffUser.role,
+        firstName: staffUser.firstName,
+        lastName: staffUser.lastName,
+      },
+    }).catch(() => {});
+
     // Send account setup email
     eventBus.emit(EVENTS.PASSWORD_RESET_REQUESTED, {
       userId: staffUser._id.toString(),
@@ -79,8 +109,28 @@ export class AdminUserService {
       throw AppError.notFound('Staff user not found.', ErrorCodes.ERR_ADMIN_USER_NOT_FOUND);
     }
 
+    const oldRole = user.role;
     user.role = newRole;
     await user.save();
+
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.RBAC_ROLE_CHANGED,
+      category: AUDIT_CATEGORY.RBAC,
+      action: 'ROLE_CHANGED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: updaterId,
+      },
+      target: {
+        targetType: TARGET_TYPE.USER,
+        targetId: user._id.toString(),
+        targetDisplay: user.email,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { role: oldRole },
+      after: { role: newRole },
+      changedFields: ['role'],
+    }).catch(() => {});
 
     // Revoke all active sessions for this user to enforce role update across devices
     await AuthSession.updateMany(
@@ -109,8 +159,28 @@ export class AdminUserService {
       throw AppError.notFound('Staff user not found.', ErrorCodes.ERR_ADMIN_USER_NOT_FOUND);
     }
 
+    const oldStatus = user.isActive;
     user.isActive = isActive;
     await user.save();
+
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.USER_STATUS_CHANGED,
+      category: AUDIT_CATEGORY.USER,
+      action: 'STATUS_CHANGED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: updaterId,
+      },
+      target: {
+        targetType: TARGET_TYPE.USER,
+        targetId: user._id.toString(),
+        targetDisplay: user.email,
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: { isActive: oldStatus },
+      after: { isActive },
+      changedFields: ['isActive'],
+    }).catch(() => {});
 
     // If disabled, revoke all active sessions immediately
     if (!isActive) {

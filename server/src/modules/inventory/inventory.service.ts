@@ -26,6 +26,14 @@ import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { escapeRegex } from '../catalog/catalog.utils.js';
 import { notificationService } from '../notifications/notification.service.js';
+import { auditService } from '../audit/audit.service.js';
+import {
+  AUDIT_EVENT_TYPE,
+  AUDIT_CATEGORY,
+  ACTOR_TYPE,
+  AUDIT_OUTCOME,
+  TARGET_TYPE,
+} from '../audit/audit.constants.js';
 
 export class InventoryService {
   /**
@@ -230,7 +238,7 @@ export class InventoryService {
     }
 
     // Record immutable audit transaction
-    await InventoryTransaction.create({
+    const tx = await InventoryTransaction.create({
       variantId: vId,
       type: dto.type,
       quantity: txQuantity,
@@ -246,6 +254,35 @@ export class InventoryService {
 
     const variant = await ProductVariant.findById(vId);
     const product = await Product.findById(variant!.productId);
+
+    auditService.recordAuditEvent({
+      eventType: AUDIT_EVENT_TYPE.INVENTORY_ADJUSTED,
+      category: AUDIT_CATEGORY.INVENTORY,
+      action: 'STOCK_ADJUSTED',
+      actor: {
+        actorType: ACTOR_TYPE.ADMIN,
+        actorUserId: adminId,
+      },
+      target: {
+        targetType: TARGET_TYPE.INVENTORY,
+        targetId: vId.toString(),
+        targetDisplay: variant?.sku || vId.toString(),
+      },
+      outcome: AUDIT_OUTCOME.SUCCESS,
+      before: {
+        onHand: prevOnHand,
+        reserved: prevReserved,
+      },
+      after: {
+        onHand: updatedInv.onHand,
+        reserved: updatedInv.reserved,
+      },
+      changedFields: ['onHand'],
+      metadata: {
+        reason: dto.reason.trim(),
+        transactionId: tx._id.toString(),
+      },
+    }).catch(() => {});
 
     return this.mapToItemDTO(updatedInv, variant, product);
   }

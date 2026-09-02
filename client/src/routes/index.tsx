@@ -65,6 +65,8 @@ import { CreateSupportTicketPage } from '../features/support/pages/CreateSupport
 import { SupportTicketDetailsPage } from '../features/support/pages/SupportTicketDetailsPage';
 import { AdminSupportTicketsPage } from '../features/support/pages/AdminSupportTicketsPage';
 import { AdminSupportTicketDetailsPage } from '../features/support/pages/AdminSupportTicketDetailsPage';
+import { AuditLogsPage } from '../features/audit/pages/AuditLogsPage';
+import { AuditLogDetailsPage } from '../features/audit/pages/AuditLogDetailsPage';
 
 export const router = createBrowserRouter([
   {
@@ -388,6 +390,19 @@ export const router = createBrowserRouter([
               {
                 path: 'support/:ticketId',
                 element: <AdminSupportTicketDetailsPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute permission="audit:read" />,
+            children: [
+              {
+                path: 'audit',
+                element: <AuditLogsPage />,
+              },
+              {
+                path: 'audit/:auditLogId',
+                element: <AuditLogDetailsPage />,
               },
             ],
           },

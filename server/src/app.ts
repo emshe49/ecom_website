@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env.js';
+import { requestIdMiddleware } from './middleware/request-id.middleware.js';
 import { requestLogger } from './middleware/logger.middleware.js';
 import { notFoundHandler } from './middleware/notFound.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
@@ -10,6 +11,9 @@ import apiRouter from './routes/index.js';
 
 export const createApp = (): Express => {
   const app = express();
+
+  // Request correlation tracking
+  app.use(requestIdMiddleware);
 
   // Basic security headers
   app.use(helmet());
