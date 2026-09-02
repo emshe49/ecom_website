@@ -8,7 +8,7 @@ import {
   generateCryptoToken,
   hashPassword,
 } from '../../shared/security/password.service.js';
-import { sendPasswordResetEmail } from '../../shared/email/email.service.js';
+import { eventBus, EVENTS } from '../../shared/events/event-bus.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 
@@ -47,15 +47,12 @@ export class AdminUserService {
     await staffUser.save();
 
     // Send account setup email
-    try {
-      await sendPasswordResetEmail(
-        staffUser.email,
-        rawActivationToken,
-        staffUser.firstName
-      );
-    } catch {
-      // Non-fatal if dev email fails
-    }
+    eventBus.emit(EVENTS.PASSWORD_RESET_REQUESTED, {
+      userId: staffUser._id.toString(),
+      email: staffUser.email,
+      name: staffUser.firstName,
+      token: rawActivationToken,
+    });
 
     return UserMapper.toSafeUser(staffUser);
   }

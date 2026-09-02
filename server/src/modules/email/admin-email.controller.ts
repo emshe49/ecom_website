@@ -18,12 +18,13 @@ export const adminEmailController = {
     }
   },
 
-  async getEmailDetails(req: Request, res: Response) {
+  async getEmailDetails(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const details = await emailQueryService.getEmailDetails(id);
       if (!details) {
-        return res.status(404).json({ success: false, message: 'Email not found' });
+        res.status(404).json({ success: false, message: 'Email not found' });
+        return;
       }
       res.json({ success: true, data: details });
     } catch (err: any) {
@@ -31,9 +32,9 @@ export const adminEmailController = {
     }
   },
 
-  async retryEmail(req: Request, res: Response) {
+  async retryEmail(req: Request, res: Response): Promise<void> {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       const result = await emailService.retryEmail(id);
       res.json({ success: true, data: result });
     } catch (err: any) {

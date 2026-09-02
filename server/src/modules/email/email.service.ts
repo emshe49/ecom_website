@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { EmailMessage } from './email-message.model.js';
 import { EmailAttempt } from './email-attempt.model.js';
 import { EMAIL_STATUS, EMAIL_PROVIDER, EMAIL_MAX_ATTEMPTS, EMAIL_ERROR_CODES } from './email.constants.js';

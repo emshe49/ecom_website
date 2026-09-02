@@ -269,7 +269,12 @@ export class AuthService {
     user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await user.save();
 
-    sendVerificationEmail(user.email, rawToken, user.firstName).catch(() => {});
+    eventBus.emit(EVENTS.USER_REGISTERED, {
+      userId: user._id.toString(),
+      email: user.email,
+      name: user.firstName,
+      token: rawToken,
+    });
 
     return { message: 'If an unverified account exists for this email, a verification link has been sent.' };
   }

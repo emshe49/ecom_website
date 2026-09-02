@@ -77,9 +77,10 @@ export const PERMISSIONS = {
   SHIPPING_MANAGE: 'shipping:manage',
   SHIPPING_FULFILL: 'shipping:fulfill',
 
-  // Analytics & Audit
+  // Analytics & Audit & Dashboard
   ANALYTICS_READ: 'analytics:read',
   AUDIT_READ: 'audit:read',
+  DASHBOARD_READ: 'dashboard:read',
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

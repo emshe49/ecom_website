@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { EmailPreference } from './email-preference.model.js';
 
 export const emailPreferenceService = {

@@ -416,7 +416,7 @@ export class InventoryService {
   async finalizeReservation(
     variantId: Types.ObjectId | string,
     quantity: number,
-    orderId?: string,
+    _orderId?: string,
     reason: string = 'Order creation final inventory consumption'
   ): Promise<{
     success: boolean;

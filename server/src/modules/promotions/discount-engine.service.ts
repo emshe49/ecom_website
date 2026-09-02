@@ -1,4 +1,3 @@
-import { Types } from 'mongoose';
 import { promotionService } from './promotion.service.js';
 import { couponService } from './coupon.service.js';
 import { discountCalculationService } from './discount-calculation.service.js';

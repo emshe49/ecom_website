@@ -46,7 +46,7 @@ export const adminPromotionController = {
 
   async getCouponById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const coupon = await couponService.getCouponById(req.params.couponId);
+      const coupon = await couponService.getCouponById(req.params.couponId as string);
 
       res.status(200).json({
         success: true,
@@ -60,7 +60,7 @@ export const adminPromotionController = {
   async updateCoupon(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const validated = updateCouponSchema.parse(req.body);
-      const coupon = await couponService.updateCoupon(req.params.couponId, validated);
+      const coupon = await couponService.updateCoupon(req.params.couponId as string, validated);
 
       res.status(200).json({
         success: true,
@@ -73,7 +73,7 @@ export const adminPromotionController = {
 
   async deleteCoupon(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      await couponService.deleteCoupon(req.params.couponId);
+      await couponService.deleteCoupon(req.params.couponId as string);
 
       res.status(200).json({
         success: true,
@@ -88,7 +88,7 @@ export const adminPromotionController = {
     try {
       const page = req.query.page ? Number(req.query.page) : undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
-      const result = await redemptionService.getCouponRedemptions(req.params.couponId, {
+      const result = await redemptionService.getCouponRedemptions(req.params.couponId as string, {
         page,
         limit,
       });
@@ -137,7 +137,7 @@ export const adminPromotionController = {
 
   async getPromotionById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const promo = await promotionService.getPromotionById(req.params.promotionId);
+      const promo = await promotionService.getPromotionById(req.params.promotionId as string);
 
       res.status(200).json({
         success: true,
@@ -151,7 +151,7 @@ export const adminPromotionController = {
   async updatePromotion(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const validated = updatePromotionSchema.parse(req.body);
-      const promo = await promotionService.updatePromotion(req.params.promotionId, validated);
+      const promo = await promotionService.updatePromotion(req.params.promotionId as string, validated);
 
       res.status(200).json({
         success: true,
@@ -164,7 +164,7 @@ export const adminPromotionController = {
 
   async deletePromotion(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      await promotionService.deletePromotion(req.params.promotionId);
+      await promotionService.deletePromotion(req.params.promotionId as string);
 
       res.status(200).json({
         success: true,

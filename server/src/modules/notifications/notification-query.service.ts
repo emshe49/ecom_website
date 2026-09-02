@@ -2,7 +2,6 @@ import { Types, FilterQuery } from 'mongoose';
 import { Notification, NotificationDocument } from './notification.model.js';
 import {
   NotificationPreference,
-  NotificationPreferenceDocument,
 } from './notification-preference.model.js';
 import { notificationMapper } from './notification.mapper.js';
 import { AppError } from '../../shared/errors/app-error.js';

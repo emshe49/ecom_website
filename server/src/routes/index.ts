@@ -40,6 +40,7 @@ import {
 } from '../modules/promotions/admin-promotion.routes.js';
 import notificationRouter from '../modules/notifications/notification.routes.js';
 import { emailRoutes, adminEmailRoutes } from '../modules/email/index.js';
+import { dashboardRouter } from '../modules/dashboard/dashboard.routes.js';
 
 const apiRouter = Router();
 
@@ -100,6 +101,9 @@ v1Router.use('/notifications', notificationRouter);
 // Email Routes (Module 19)
 v1Router.use('/email', emailRoutes);
 v1Router.use('/admin/email', adminEmailRoutes);
+
+// Admin Dashboard Routes (Module 20)
+v1Router.use('/admin/dashboard', dashboardRouter);
 
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);
