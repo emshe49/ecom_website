@@ -79,6 +79,7 @@ export const PERMISSIONS = {
 
   // Analytics & Audit & Dashboard
   ANALYTICS_READ: 'analytics:read',
+  ANALYTICS_EXPORT: 'analytics:export',
   AUDIT_READ: 'audit:read',
   DASHBOARD_READ: 'dashboard:read',
 } as const;

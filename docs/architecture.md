@@ -528,6 +528,56 @@ The Wishlist module enables authenticated customers to bookmark products for fut
 | `PATCH`| `/api/v1/admin/shipping/shipments/:id/tracking` | Yes (`shipping:fulfill`) | Updates carrier name, tracking number, and tracking URL |
 | `POST` | `/api/v1/admin/shipping/shipments/:id/cancel` | Yes (`shipping:fulfill`) | Cancels shipment and marks order as CANCELLED |
 
+---
+
+## 14. Module 21: Analytics & Reports Engine
+
+### 14.1 Architectural Design & Monolithic Philosophy
+The Analytics & Reports Engine serves as the core Business Intelligence system of the modular monolith. It provides read-only aggregation directly from primary domain MongoDB collections using optimized pipeline stages (`$match`, `$group`, `$facet`, `$lookup`, `$unwind`) without external data warehouses, message brokers, or separate microservices.
+
+### 14.2 Financial Formulas & Snapshot Integrity
+1. **Financial Minor Units**:
+   - `grossRevenue` is computed strictly from non-cancelled, paid orders (`paymentStatus` in `PAID`, `PARTIALLY_REFUNDED`).
+   - `netRevenue = grossRevenue - refundsAmount`.
+   - `AOV = grossRevenue / paidOrdersCount`.
+2. **Immutable Price Snapshots**:
+   - Product sales and revenue are calculated from the immutable `order.items[].price` and `order.items[].finalLineTotal` snapshots rather than mutable product master prices.
+3. **Attribution Caveats**:
+   - Historical category and brand sales are attributed based on current product categorization and explicitly annotated with `attributionNote: "Historical report is based on current Product assignment"`.
+4. **Repeat Customer Cohorts**:
+   - Repeat customers are defined deterministically as customer accounts with `>= 2` non-cancelled paid orders.
+5. **CSV Injection & RFC 4180 Security**:
+   - Every CSV export enforces RFC 4180 escaping, UTF-8 BOM (`\uFEFF`), and prefixes formula trigger characters (`=`, `+`, `-`, `@`, `\t`, `\r`) with a single quote (`'`) to neutralize CSV/spreadsheet formula execution attacks (`ANALYTICS-SEC-10`).
+   - Exports enforce a hard limit of `50,000` rows per export to prevent out-of-memory exhaustion.
+
+### 14.3 Analytics Endpoint Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `GET` | `/api/v1/admin/analytics/sales` | Yes (`analytics:read`) | Financial volume, gross/net revenue, timeseries trends |
+| `GET` | `/api/v1/admin/analytics/sales/export` | Yes (`analytics:export`) | Stream CSV export of sales reports |
+| `GET` | `/api/v1/admin/analytics/orders` | Yes (`analytics:read`) | Order volume, status breakdowns, and paginated ledger |
+| `GET` | `/api/v1/admin/analytics/orders/export` | Yes (`analytics:export`) | Stream CSV export of orders reports |
+| `GET` | `/api/v1/admin/analytics/payments` | Yes (`analytics:read`) | Payment success/failure rates, method & provider rollups |
+| `GET` | `/api/v1/admin/analytics/payments/export` | Yes (`analytics:export`) | Stream CSV export of payments reports |
+| `GET` | `/api/v1/admin/analytics/products` | Yes (`analytics:read`) | Product sales metrics, ratings, return rates |
+| `GET` | `/api/v1/admin/analytics/products/export` | Yes (`analytics:export`) | Stream CSV export of products reports |
+| `GET` | `/api/v1/admin/analytics/categories` | Yes (`analytics:read`) | Category sales, orders, and net revenue |
+| `GET` | `/api/v1/admin/analytics/categories/export` | Yes (`analytics:export`) | Stream CSV export of categories reports |
+| `GET` | `/api/v1/admin/analytics/brands` | Yes (`analytics:read`) | Brand volume, units sold, and revenue |
+| `GET` | `/api/v1/admin/analytics/brands/export` | Yes (`analytics:export`) | Stream CSV export of brands reports |
+| `GET` | `/api/v1/admin/analytics/customers` | Yes (`analytics:read`) | Customer acquisition, repeat cohorts, spend ledger |
+| `GET` | `/api/v1/admin/analytics/customers/export` | Yes (`analytics:export`) | Stream CSV export of customers reports |
+| `GET` | `/api/v1/admin/analytics/inventory` | Yes (`analytics:read`) | SKU stock movement audits and health metrics |
+| `GET` | `/api/v1/admin/analytics/inventory/export` | Yes (`analytics:export`) | Stream CSV export of inventory reports |
+| `GET` | `/api/v1/admin/analytics/returns` | Yes (`analytics:read`) | Return requests, return rates, reason breakdown |
+| `GET` | `/api/v1/admin/analytics/returns/export` | Yes (`analytics:export`) | Stream CSV export of returns reports |
+| `GET` | `/api/v1/admin/analytics/refunds` | Yes (`analytics:read`) | Financial refunds issued, method breakdown |
+| `GET` | `/api/v1/admin/analytics/refunds/export` | Yes (`analytics:export`) | Stream CSV export of refunds reports |
+| `GET` | `/api/v1/admin/analytics/promotions` | Yes (`analytics:read`) | Coupon redemptions and promotion campaign performance |
+| `GET` | `/api/v1/admin/analytics/shipping` | Yes (`analytics:read`) | Carrier transit durations and SLA adherence |
+| `GET` | `/api/v1/admin/analytics/reviews` | Yes (`analytics:read`) | 1-5 star sentiment rating distribution and top/lowest products |
+
+
 
 
 

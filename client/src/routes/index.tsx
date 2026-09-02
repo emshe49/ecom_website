@@ -41,10 +41,24 @@ import { AdminShipmentsPage } from '../features/shipping/pages/AdminShipmentsPag
 import { AdminShipmentDetailsPage } from '../features/shipping/pages/AdminShipmentDetailsPage';
 import { MyReviewsPage } from '../features/reviews/pages/MyReviewsPage';
 import { AdminReviewsPage } from '../features/reviews/pages/AdminReviewsPage';
+import { AdminReviewDetailsPage } from '../features/reviews/pages/AdminReviewDetailsPage';
 import { AdminCouponsPage } from '../features/admin/promotions/pages/AdminCouponsPage';
 import { AdminCouponDetailsPage } from '../features/admin/promotions/pages/AdminCouponDetailsPage';
 import { AdminPromotionsPage } from '../features/admin/promotions/pages/AdminPromotionsPage';
 import { NotificationsPage } from '../features/notifications/pages/NotificationsPage';
+
+import {
+  AnalyticsOverviewPage,
+  SalesAnalyticsPage,
+  OrdersAnalyticsPage,
+  ProductsAnalyticsPage,
+  CustomersAnalyticsPage,
+  InventoryAnalyticsPage,
+  ReturnsRefundsAnalyticsPage,
+  PromotionsAnalyticsPage,
+  ShippingAnalyticsPage,
+  ReviewsAnalyticsPage,
+} from '../features/analytics';
 
 export const router = createBrowserRouter([
   {
@@ -298,6 +312,51 @@ export const router = createBrowserRouter([
               {
                 path: 'inventory',
                 element: <InventoryPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute permission="analytics:read" />,
+            children: [
+              {
+                path: 'analytics',
+                element: <AnalyticsOverviewPage />,
+              },
+              {
+                path: 'analytics/sales',
+                element: <SalesAnalyticsPage />,
+              },
+              {
+                path: 'analytics/orders',
+                element: <OrdersAnalyticsPage />,
+              },
+              {
+                path: 'analytics/products',
+                element: <ProductsAnalyticsPage />,
+              },
+              {
+                path: 'analytics/customers',
+                element: <CustomersAnalyticsPage />,
+              },
+              {
+                path: 'analytics/inventory',
+                element: <InventoryAnalyticsPage />,
+              },
+              {
+                path: 'analytics/returns',
+                element: <ReturnsRefundsAnalyticsPage />,
+              },
+              {
+                path: 'analytics/promotions',
+                element: <PromotionsAnalyticsPage />,
+              },
+              {
+                path: 'analytics/shipping',
+                element: <ShippingAnalyticsPage />,
+              },
+              {
+                path: 'analytics/reviews',
+                element: <ReviewsAnalyticsPage />,
               },
             ],
           },
