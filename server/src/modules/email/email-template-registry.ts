@@ -155,7 +155,47 @@ export const TEMPLATES = {
     subject: (d: any) => `Refund Failed for Order ${escapeHtml(d.orderNumber)}`,
     html: (d: any) => layoutHtml(`<h1>Refund Failed</h1><p>We encountered an issue processing your refund of ${d.amount} ${d.currency} for order ${escapeHtml(d.orderNumber)}.</p>`),
     text: (d: any) => `We encountered an issue processing your refund of ${d.amount} ${d.currency} for order ${d.orderNumber}.`,
-  }
+  },
+  SUPPORT_TICKET_CREATED: {
+    id: 'SUPPORT_TICKET_CREATED',
+    schema: z.object({
+      ticketNumber: z.string(),
+      subject: z.string(),
+      category: z.string(),
+    }),
+    subject: (d: any) => `Support Ticket Created: ${escapeHtml(d.ticketNumber)}`,
+    html: (d: any) => layoutHtml(`<h1>Support Ticket Created</h1><p>Your support request <strong>${escapeHtml(d.ticketNumber)}</strong> has been received.</p><p><strong>Subject:</strong> ${escapeHtml(d.subject)}</p><p><strong>Category:</strong> ${escapeHtml(d.category)}</p><p>Our support team will review your ticket and reply shortly.</p>`),
+    text: (d: any) => `Support Ticket Created: ${d.ticketNumber}. Subject: ${d.subject}. Category: ${d.category}. Our team will review your ticket and reply shortly.`,
+  },
+  SUPPORT_STAFF_REPLY: {
+    id: 'SUPPORT_STAFF_REPLY',
+    schema: z.object({
+      ticketNumber: z.string(),
+      reply: z.string(),
+    }),
+    subject: (d: any) => `New Reply on Ticket ${escapeHtml(d.ticketNumber)}`,
+    html: (d: any) => layoutHtml(`<h1>Support Reply</h1><p>Our support team has replied to your ticket <strong>${escapeHtml(d.ticketNumber)}</strong>:</p><blockquote>${escapeHtml(d.reply)}</blockquote><p>Please log in to your account to continue the conversation.</p>`),
+    text: (d: any) => `New reply on ticket ${d.ticketNumber}: ${d.reply}`,
+  },
+  SUPPORT_TICKET_RESOLVED: {
+    id: 'SUPPORT_TICKET_RESOLVED',
+    schema: z.object({
+      ticketNumber: z.string(),
+      resolutionSummary: z.string(),
+    }),
+    subject: (d: any) => `Support Ticket Resolved: ${escapeHtml(d.ticketNumber)}`,
+    html: (d: any) => layoutHtml(`<h1>Ticket Resolved</h1><p>Your support ticket <strong>${escapeHtml(d.ticketNumber)}</strong> has been marked as resolved.</p><p><strong>Resolution:</strong> ${escapeHtml(d.resolutionSummary)}</p><p>If you need further help, you may reopen this ticket within 7 days.</p>`),
+    text: (d: any) => `Support ticket ${d.ticketNumber} has been resolved. Resolution: ${d.resolutionSummary}. You may reopen it within 7 days if needed.`,
+  },
+  SUPPORT_TICKET_REOPENED: {
+    id: 'SUPPORT_TICKET_REOPENED',
+    schema: z.object({
+      ticketNumber: z.string(),
+    }),
+    subject: (d: any) => `Support Ticket Reopened: ${escapeHtml(d.ticketNumber)}`,
+    html: (d: any) => layoutHtml(`<h1>Ticket Reopened</h1><p>Support ticket <strong>${escapeHtml(d.ticketNumber)}</strong> has been reopened and is awaiting staff attention.</p>`),
+    text: (d: any) => `Support ticket ${d.ticketNumber} has been reopened and is awaiting staff attention.`,
+  },
 };
 
 export const emailTemplateRegistry = {

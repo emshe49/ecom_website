@@ -42,6 +42,8 @@ import notificationRouter from '../modules/notifications/notification.routes.js'
 import { emailRoutes, adminEmailRoutes } from '../modules/email/index.js';
 import { dashboardRouter } from '../modules/dashboard/dashboard.routes.js';
 import { analyticsRouter } from '../modules/analytics/analytics.routes.js';
+import { supportRouter } from '../modules/support/support.routes.js';
+import { adminSupportRouter } from '../modules/support/support-admin.routes.js';
 
 const apiRouter = Router();
 
@@ -108,6 +110,10 @@ v1Router.use('/admin/dashboard', dashboardRouter);
 
 // Analytics & Reports Routes (Module 21)
 v1Router.use('/admin/analytics', analyticsRouter);
+
+// Customer Support & Tickets Routes (Module 22)
+v1Router.use('/support/tickets', supportRouter);
+v1Router.use('/admin/support/tickets', adminSupportRouter);
 
 // Mount versioned routers
 apiRouter.use('/v1', v1Router);

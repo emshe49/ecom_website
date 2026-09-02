@@ -577,6 +577,88 @@ The Analytics & Reports Engine serves as the core Business Intelligence system o
 | `GET` | `/api/v1/admin/analytics/shipping` | Yes (`analytics:read`) | Carrier transit durations and SLA adherence |
 | `GET` | `/api/v1/admin/analytics/reviews` | Yes (`analytics:read`) | 1-5 star sentiment rating distribution and top/lowest products |
 
+---
+
+## 15. Module 22 — Customer Support & Ticket Management
+
+### 15.1 Architectural Blueprint & Scope Boundaries
+The Customer Support & Ticket Management module provides an asynchronous, audit-tracked helpdesk system within the modular monolith. It enables authenticated customers to submit support inquiries with optional references to orders/payments/shipments, while equipping authorized support staff (`support:read`, `support:write`, `support:assign`) with queue management, assignment, priority triage, internal collaboration notes, and resolution workflows.
+
+#### Scope Boundaries
+1. **Asynchronous Ticket System**: Real-time WebSockets, live chat servers, and AI bots are explicitly out of scope. Communications are modeled as threaded, chronological message records.
+2. **Financial and Operational Safeguards**: Support staff cannot mutate core commerce entities (Orders, Payments, Refunds, Inventory, Shipments) through the support interface. Support tickets link via verified read-only foreign keys to assist context triage.
+3. **Internal Note Isolation (`SUPPORT-SEC-05`)**: Internal staff notes (`isInternal: true`) and internal history records are strictly omitted from customer-facing DTOs and API responses.
+
+### 15.2 State Machine & Business Rules
+Support tickets follow a deterministic transition lifecycle managed by `supportTransitionService`:
+
+```
+                       ┌────────────────────────┐
+                       │          OPEN          │
+                       └───────────┬────────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              ▼                    ▼                    ▼
+     ┌────────────────┐   ┌────────────────┐   ┌────────────────┐
+     │  IN_PROGRESS   │◄─►│WAITING_CUSTOMER│◄─►│WAITING_SUPPORT │
+     └────────┬───────┘   └────────┬───────┘   └────────┬───────┘
+              │                    │                    │
+              └────────────────────┼────────────────────┘
+                                   │
+                                   ▼
+                       ┌────────────────────────┐
+                       │        RESOLVED        │
+                       └───────────┬────────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    ▼                             ▼
+       ┌────────────────────────┐    ┌────────────────────────┐
+       │     REOPENED (OPEN/    │    │         CLOSED         │
+       │    WAITING_SUPPORT)    │    │       (Terminal)       │
+       └────────────────────────┘    └────────────────────────┘
+```
+
+- **Reopen Window**: Customers can reopen a `RESOLVED` ticket within **7 days** (168 hours) of resolution. Reopening transitions the ticket to `WAITING_FOR_SUPPORT` and increments `staffUnreadCount`. Once 7 days have passed, reopening is rejected, requiring a new ticket.
+- **Closed Ticket Immutability**: `CLOSED` is a terminal status. No further replies, notes, assignments, or status mutations are permitted.
+- **Resolution Validation**: Transitioning to `RESOLVED` requires a non-empty `resolutionSummary` (minimum 5 characters) documenting the resolution for audit purposes.
+- **Atomic Assignment & Concurrency**: Staff assignment uses atomic find-and-modify (`SupportTicket.findOneAndUpdate({ _id, assignedTo: null }, ...)`). If another agent claims the ticket concurrently, a `409 Conflict` (`ERR_SUPPORT_ALREADY_ASSIGNED`) is returned.
+
+### 15.3 Security Controls (SUPPORT-SEC-01..10)
+1. **SUPPORT-SEC-01 (Authentication)**: All customer and staff endpoints require valid JWT authentication (`authenticate`). Anonymous ticket submission is rejected.
+2. **SUPPORT-SEC-02 (Customer IDOR Protection)**: Customers can only query, view, reply to, reopen, or close tickets where `customerId == req.user.userId`. Other tickets return `404 Not Found`.
+3. **SUPPORT-SEC-03 (Entity Reference Anti-IDOR)**: Optional referenced orders must belong to the submitting customer (`order.userId == customerId`). Referenced payments or shipments must strictly belong to that verified order.
+4. **SUPPORT-SEC-04 (Input Tampering & Strict Schema)**: Customer ticket creation uses Zod `.strict()` validation. Any client-injected fields (`priority`, `status`, `assignedTo`, `resolutionSummary`) are rejected with `400 Bad Request`.
+5. **SUPPORT-SEC-05 (Internal Note Privacy)**: Customer endpoints and DTO mappers filter all messages where `isInternal: true` and history actions matching internal notes.
+6. **SUPPORT-SEC-06 (Staff RBAC Enforcement)**: Staff endpoints enforce granular permissions (`support:read`, `support:write`, `support:assign`). Unauthorized roles receive `403 Forbidden`.
+7. **SUPPORT-SEC-07 (Atomic Claim Concurrency)**: Concurrency race conditions in `assign-to-me` operations are eliminated via MongoDB atomic queries.
+8. **SUPPORT-SEC-08 (Side-Effect Resilience)**: Customer and staff email and in-app notifications are wrapped in isolated `try/catch` blocks so notification delivery failures never roll back database transactions.
+9. **SUPPORT-SEC-09 (Reopen Window Expiry)**: Reopening past 7 days returns `400 Bad Request` (`ERR_SUPPORT_REOPEN_WINDOW_EXPIRED`).
+10. **SUPPORT-SEC-10 (Closed Immutability)**: Posting messages or altering closed tickets returns `400 Bad Request` (`ERR_SUPPORT_TICKET_CLOSED`).
+
+### 15.4 Support API Catalog
+| Method | Endpoint | Auth Required | Description |
+| :--- | :--- | :---: | :--- |
+| `POST` | `/api/v1/support/tickets` | Customer (`authenticate`) | Create new support ticket |
+| `GET` | `/api/v1/support/tickets` | Customer (`authenticate`) | List customer's support tickets with filters & pagination |
+| `GET` | `/api/v1/support/tickets/:ticketId` | Customer (`authenticate`) | Get ticket details and conversation thread (safe customer DTO) |
+| `POST` | `/api/v1/support/tickets/:ticketId/messages` | Customer (`authenticate`) | Post customer reply to ticket |
+| `POST` | `/api/v1/support/tickets/:ticketId/read` | Customer (`authenticate`) | Clear customer unread badge count |
+| `POST` | `/api/v1/support/tickets/:ticketId/reopen` | Customer (`authenticate`) | Reopen resolved ticket within 7-day window |
+| `POST` | `/api/v1/support/tickets/:ticketId/close` | Customer (`authenticate`) | Close resolved or active ticket |
+| `GET` | `/api/v1/admin/support/tickets` | Staff (`support:read`) | Filter, search, and page staff support queue |
+| `GET` | `/api/v1/admin/support/tickets/staff` | Staff (`support:read`) | List staff members available for ticket assignment |
+| `GET` | `/api/v1/admin/support/tickets/:ticketId` | Staff (`support:read`) | Get full staff ticket detail including internal notes & audit log |
+| `POST` | `/api/v1/admin/support/tickets/:ticketId/messages` | Staff (`support:write`) | Send public staff reply to customer |
+| `POST` | `/api/v1/admin/support/tickets/:ticketId/internal-notes` | Staff (`support:write`) | Post internal staff collaboration note |
+| `PATCH` | `/api/v1/admin/support/tickets/:ticketId/priority` | Staff (`support:write`) | Update ticket priority (LOW, NORMAL, HIGH, URGENT) |
+| `PATCH` | `/api/v1/admin/support/tickets/:ticketId/status` | Staff (`support:write`) | Transition ticket status following state machine rules |
+| `POST` | `/api/v1/admin/support/tickets/:ticketId/assign` | Staff (`support:assign`) | Assign or reassign ticket to a staff member |
+| `POST` | `/api/v1/admin/support/tickets/:ticketId/assign-to-me` | Staff (`support:assign`) | Atomically claim ticket for the authenticated staff agent |
+| `POST` | `/api/v1/admin/support/tickets/:ticketId/resolve` | Staff (`support:write`) | Resolve ticket with mandatory resolution summary |
+| `POST` | `/api/v1/admin/support/tickets/:ticketId/close` | Staff (`support:write`) | Administratively close ticket |
+| `POST` | `/api/v1/admin/support/tickets/:ticketId/read` | Staff (`support:read`) | Clear staff unread badge count |
+
+
 
 
 

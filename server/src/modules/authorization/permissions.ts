@@ -64,7 +64,10 @@ export const PERMISSIONS = {
   // Support
   SUPPORT_READ: 'support:read',
   SUPPORT_UPDATE: 'support:update',
+  SUPPORT_REPLY: 'support:reply',
   SUPPORT_ASSIGN: 'support:assign',
+  SUPPORT_MANAGE: 'support:manage',
+  SUPPORT_INTERNAL_NOTE: 'support:internal_note',
   SUPPORT_CLOSE: 'support:close',
 
   // Payments (Module 13)

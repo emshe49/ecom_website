@@ -114,6 +114,12 @@ export const AppLayout: React.FC = () => {
                 >
                   <span>My Reviews</span>
                 </Link>
+                <Link
+                  to="/support"
+                  className="text-xs font-semibold text-slate-300 hover:text-emerald-400 transition-colors hidden sm:flex items-center gap-1"
+                >
+                  <span>Support</span>
+                </Link>
               </>
             )}
 

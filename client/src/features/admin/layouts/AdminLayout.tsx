@@ -20,6 +20,7 @@ export const AdminLayout: React.FC = () => {
   const canReadCoupons = usePermission('coupon:read') || usePermission('coupon:manage');
   const canReadPromotions = usePermission('promotion:read') || usePermission('promotion:manage');
   const canReadAnalytics = usePermission('analytics:read');
+  const canReadSupport = usePermission('support:read');
 
   const roleStyle = user?.role ? ROLE_COLORS[user.role] : ROLE_COLORS.CUSTOMER;
   const roleName = user?.role ? ROLE_LABELS[user.role] : 'Staff';
@@ -80,6 +81,24 @@ export const AdminLayout: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
               <span>Analytics & Reports</span>
+            </NavLink>
+          )}
+
+          {canReadSupport && (
+            <NavLink
+              to="/admin/support"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3.5 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive
+                    ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
+                }`
+              }
+            >
+              <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+              <span>Support Tickets</span>
             </NavLink>
           )}
 

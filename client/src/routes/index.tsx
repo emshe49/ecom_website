@@ -60,6 +60,12 @@ import {
   ReviewsAnalyticsPage,
 } from '../features/analytics';
 
+import { SupportTicketsPage } from '../features/support/pages/SupportTicketsPage';
+import { CreateSupportTicketPage } from '../features/support/pages/CreateSupportTicketPage';
+import { SupportTicketDetailsPage } from '../features/support/pages/SupportTicketDetailsPage';
+import { AdminSupportTicketsPage } from '../features/support/pages/AdminSupportTicketsPage';
+import { AdminSupportTicketDetailsPage } from '../features/support/pages/AdminSupportTicketDetailsPage';
+
 export const router = createBrowserRouter([
   {
     path: '/',
@@ -154,6 +160,18 @@ export const router = createBrowserRouter([
           {
             path: 'account/notifications',
             element: <NotificationsPage />,
+          },
+          {
+            path: 'support',
+            element: <SupportTicketsPage />,
+          },
+          {
+            path: 'support/new',
+            element: <CreateSupportTicketPage />,
+          },
+          {
+            path: 'support/:ticketId',
+            element: <SupportTicketDetailsPage />,
           },
         ],
       },
@@ -357,6 +375,19 @@ export const router = createBrowserRouter([
               {
                 path: 'analytics/reviews',
                 element: <ReviewsAnalyticsPage />,
+              },
+            ],
+          },
+          {
+            element: <PermissionRoute permission="support:read" />,
+            children: [
+              {
+                path: 'support',
+                element: <AdminSupportTicketsPage />,
+              },
+              {
+                path: 'support/:ticketId',
+                element: <AdminSupportTicketDetailsPage />,
               },
             ],
           },

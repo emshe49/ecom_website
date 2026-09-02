@@ -58,7 +58,7 @@ export const notificationService = {
         entityId: input.entityId || null,
         actionUrl: input.actionUrl || null,
         metadata: input.metadata || null,
-        deduplicationKey: input.deduplicationKey || null,
+        deduplicationKey: input.deduplicationKey || undefined,
         sourceModule: input.sourceModule || null,
       });
 
