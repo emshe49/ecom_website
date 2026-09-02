@@ -3,6 +3,7 @@ import { createApp } from './app.js';
 import { env } from './config/env.js';
 import { connectDB, disconnectDB } from './database/mongoose.js';
 import { logger } from './shared/utils/logger.js';
+import { setupEmailEventHandlers } from './modules/email/email.events.js';
 
 let server: Server | null = null;
 let isShuttingDown = false;
@@ -13,6 +14,9 @@ const startServer = async (): Promise<void> => {
 
     // Connect to database
     await connectDB();
+
+    // Setup event handlers
+    setupEmailEventHandlers();
 
     // Create Express application
     const app = createApp();

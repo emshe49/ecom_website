@@ -20,10 +20,7 @@ import {
   generateRefreshTokenString,
   getRefreshTokenExpiryDate,
 } from './auth-token.service.js';
-import {
-  sendVerificationEmail,
-  sendPasswordResetEmail,
-} from '../../shared/email/email.service.js';
+import { eventBus, EVENTS } from '../../shared/events/event-bus.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 
@@ -64,8 +61,13 @@ export class AuthService {
       emailVerificationExpiresAt,
     });
 
-    // Send verification email asynchronously
-    sendVerificationEmail(user.email, rawToken, user.firstName).catch(() => {});
+    // Emit event asynchronously
+    eventBus.emit(EVENTS.USER_REGISTERED, {
+      userId: user._id.toString(),
+      email: user.email,
+      name: user.firstName,
+      token: rawToken
+    });
 
     return {
       user: user.toJSON() as SafeUser,
@@ -285,7 +287,12 @@ export class AuthService {
       user.passwordResetExpiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
       await user.save();
 
-      sendPasswordResetEmail(user.email, rawToken, user.firstName).catch(() => {});
+      eventBus.emit(EVENTS.PASSWORD_RESET_REQUESTED, {
+        userId: user._id.toString(),
+        email: user.email,
+        name: user.firstName,
+        token: rawToken
+      });
     }
 
     // Generic response to prevent account enumeration

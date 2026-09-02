@@ -35,6 +35,7 @@ import { notificationService } from '../notifications/notification.service.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { ErrorCodes } from '../../shared/errors/error-codes.js';
 import { logger } from '../../shared/utils/logger.js';
+import { eventBus, EVENTS } from '../../shared/events/event-bus.js';
 
 export const orderService = {
   /**
@@ -266,6 +267,16 @@ export const orderService = {
       .catch((err) =>
         logger.error(`Order placed notification failed: ${err.message}`)
       );
+      
+    // Emit event asynchronously
+    eventBus.emit(EVENTS.ORDER_PLACED, {
+      userId,
+      orderId: newOrder._id.toString(),
+      email: customerUser.email,
+      name: customerUser.firstName,
+      orderNumber,
+      total: newOrder.total
+    });
 
     return orderMapper.toOrderDetailDTO(newOrder);
   },
